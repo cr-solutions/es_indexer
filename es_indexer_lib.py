@@ -42,10 +42,10 @@ class es_indexer:
    ###########################################################
 
    def __init__(self, s3bucket_filetype: str, s3prefix_folder: str, indexname: str, bulklimit: int, configfile: str = ''):
-      global es_indexer_debug
+      global ES_INDEXER_DEBUG
 
       try:
-         if es_indexer_debug:
+         if ES_INDEXER_DEBUG:
             self.debug = True
       except NameError:
             pass
@@ -201,13 +201,17 @@ class es_indexer:
       joins = []
       try:
          for item in data:
+            schema_table = item["schema"] + '.' + item["table"] + '.'
             if i == 0:
                tfrom = item["schema"] + '.' + item["table"]
             else:
                joins.append({"join": item["join"], "schema": item["schema"], "table": item["table"]})
 
             for fname in item["fields"]:
-               fields += item["schema"] + '.' + item["table"] + '.' + fname + ', '
+               if fname.find('.') > 0:  # to support functions
+                  schema_table = ''
+
+               fields += schema_table + fname + ', '
 
 
             i += 1
@@ -427,14 +431,14 @@ class es_indexer:
    ###########################################################
 
    def enable_debug():
-      global es_indexer_debug
-      es_indexer_debug = True
+      global ES_INDEXER_DEBUG
+      ES_INDEXER_DEBUG = True
 
    ###########################################################
 
    def disable_debug():
-      global es_indexer_debug
-      es_indexer_debug = False
+      global ES_INDEXER_DEBUG
+      ES_INDEXER_DEBUG = False
 
    ###########################################################
 
