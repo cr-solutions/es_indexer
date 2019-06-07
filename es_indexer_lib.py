@@ -87,7 +87,7 @@ class es_indexer:
    ###########################################################
 
    def _fs_getConfig(self):
-      str = ''
+      buf = ''
       config_file = ''
 
       if self.config_file == '':
@@ -107,16 +107,16 @@ class es_indexer:
          self.config_file = config_file
 
          hFile = open(config_file, 'r')
-         str = hFile.read()
+         buf = hFile.read()
          hFile.close()
 
       except BaseException as err:
-         raise UserWarning('Error read config from local fs, File: "' + config_file + '"' + str(err))
+         raise UserWarning('Error read config from local fs, File: "' + config_file + '" - ' + str(err))
 
       try:
-         self.config = json.loads(str)
+         self.config = json.loads(buf)
       except BaseException as err:
-         raise UserWarning('JSON file ' + self.config_file + ' format error' + str(err))
+         raise UserWarning('JSON file ' + self.config_file + ' format error - ' + str(err))
 
 
    ###########################################################
@@ -143,13 +143,13 @@ class es_indexer:
          obj = s3.Object(self.s3bucket, config_file)
          str = obj.get()['Body'].read().decode('utf-8')
       except BaseException as err:
-         raise UserWarning('Error read config from s3 bucket "' + self.s3bucket + '", File: "' + config_file + '"' + str(err))
+         raise UserWarning('Error read config from s3 bucket "' + self.s3bucket + '", File: "' + config_file + '" - ' + str(err))
 
 
       try:
          self.config = json.loads(str)
       except BaseException as err:
-         raise UserWarning('JSON file ' + self.config_file + ' format error' + str(err))
+         raise UserWarning('JSON file ' + self.config_file + ' format error - ' + str(err))
 
 
    ###########################################################
@@ -166,7 +166,7 @@ class es_indexer:
          user = self.config['rds']['user']
          pw = self.config['rds']['password']
       except KeyError as err:
-         raise UserWarning('JSON file ' + self.config_file + ' format error, missing key:' + str(err))
+         raise UserWarning('JSON file ' + self.config_file + ' format error, missing key: ' + str(err))
 
       timeout = None
       try:
@@ -199,7 +199,7 @@ class es_indexer:
          last_mod_field = self.config['sql']['last-modified-timestamp-field']
          data = self.config['sql']['data']
       except KeyError as err:
-         raise UserWarning('JSON file ' + self.config_file + ' format error, missing key:'+str(err))
+         raise UserWarning('JSON file ' + self.config_file + ' format error, missing key: '+str(err))
 
 
       fields = ''
@@ -233,7 +233,7 @@ class es_indexer:
          query += ' WHERE ' + last_mod_field + ' != "1970-01-01 00:00:00" ORDER BY '+last_mod_field+' ASC LIMIT '+str(self.bulklimit)
 
       except KeyError as err:
-         raise UserWarning('JSON file ' + self.config_file + ' format error, missing key:'+str(err))
+         raise UserWarning('JSON file ' + self.config_file + ' format error, missing key: '+str(err))
 
 
       return query
@@ -273,7 +273,7 @@ class es_indexer:
          mapping = self.config["mapping"]
          last_mod_field_upd_key = self.config['sql']['last-modified-timestamp-upd-key']
       except KeyError as err:
-         raise UserWarning('JSON file ' + self.config_file + ' format error, missing key:'+str(err))
+         raise UserWarning('JSON file ' + self.config_file + ' format error, missing key: '+str(err))
 
 
       if not '_id' in mapping:
@@ -366,7 +366,7 @@ class es_indexer:
       try:
          endpoint = self.config['es']['endpoint']
       except KeyError as err:
-         raise UserWarning('JSON file ' + self.config_file + ' format error, missing key:'+str(err))
+         raise UserWarning('JSON file ' + self.config_file + ' format error, missing key: '+str(err))
 
       timeout = None
       try:
@@ -382,7 +382,7 @@ class es_indexer:
       try:
          res = requests.put(url=endpoint+'/_bulk', verify=False, data=json_byte,  headers=headers, timeout=timeout)
       except requests.exceptions.ConnectionError as err:
-         raise UserWarning('Connect Error'+str(err))
+         raise UserWarning('Connect Error '+str(err))
       except requests.exceptions.ReadTimeout as err:
          raise UserWarning('HTTP Read Error, current timeout ' + str(timeout) + ', you can increase it via key timeout in the *.json file - ' + str(err))
 
@@ -399,10 +399,10 @@ class es_indexer:
             raise UserWarning('HTTP Error ' + str(res.status_code) + msg)
 
          if resJSON['errors'] != False:
-            raise UserWarning('Error add/update index'+msg)
+            raise UserWarning('Error add/update index '+msg)
 
       except KeyError as err:
-         raise UserWarning('JSON response format error, missing key:'+str(err)+"\r\n\r\n"+msg)
+         raise UserWarning('JSON response format error, missing key: '+str(err)+"\r\n\r\n"+msg)
 
 
       self._sqlUpd()
