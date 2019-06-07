@@ -13,7 +13,7 @@
 # All Rights Reserved.
 
 
-import pymysql, boto3, json, traceback, urllib3, requests, inspect, os, sys
+import pymysql, boto3, json, traceback, urllib3, requests, inspect, os, sys, re
 
 ###########################################################
 ###########################################################
@@ -168,6 +168,13 @@ class es_indexer:
       except KeyError as err:
          raise UserWarning('JSON file ' + self.config_file + ' format error, missing key:' + str(err))
 
+      timeout = None
+      try:
+         timeout = int(self.config['rds']['timeout'])
+      except KeyError as err:
+         timeout = 3
+         pass
+
       host = endpoint
       port = 3306
       if endpoint.find(':') != -1:
@@ -177,9 +184,9 @@ class es_indexer:
 
 
       try:
-         self.db = pymysql.connect(host=endpoint, port=port, user=user, passwd=pw, charset='utf8', connect_timeout=3)
+         self.db = pymysql.connect(host=endpoint, port=port, user=user, passwd=pw, charset='utf8', connect_timeout=timeout)
       except pymysql.err.OperationalError as err:
-         raise UserWarning('Error '+str(err))
+         raise UserWarning('Error , current timeout ' + str(timeout) + ', you can increase it via key timeout in the *.json file - ' + str(err))
 
       return self.db
 
@@ -309,9 +316,11 @@ class es_indexer:
             for field in fieldnames:
                 var = '$'+field
                 val = str(row[field])
+
                 val = val.replace("\n", '')  # remove linefeeds to not break JSON
                 val = val.replace("\r", '')
                 val = val.replace("\t", '')
+                val = re.sub(pattern=r'([\"\\])', repl=r'\\\1', string=val)  # escape characters
                 mapping_str = mapping_str.replace(var, val)
 
                 if es_id == var:
@@ -359,15 +368,23 @@ class es_indexer:
       except KeyError as err:
          raise UserWarning('JSON file ' + self.config_file + ' format error, missing key:'+str(err))
 
+      timeout = None
+      try:
+         timeout = int(self.config['es']['timeout'])
+      except KeyError as err:
+         timeout = 3
+         pass
+
 
       urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)  # to support local ES endpoints via SSH tunnel, sample: https://127.0.0.1:9200
 
       res = None
       try:
-         res = requests.put(url=endpoint+'/_bulk', verify=False, data=json_byte,  headers=headers, timeout=3)
+         res = requests.put(url=endpoint+'/_bulk', verify=False, data=json_byte,  headers=headers, timeout=timeout)
       except requests.exceptions.ConnectionError as err:
-         raise UserWarning('Error'+str(err))
-
+         raise UserWarning('Connect Error'+str(err))
+      except requests.exceptions.ReadTimeout as err:
+         raise UserWarning('HTTP Read Error, current timeout ' + str(timeout) + ', you can increase it via key timeout in the *.json file - ' + str(err))
 
       resJSON = json.loads(res.text)
 
