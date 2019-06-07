@@ -321,7 +321,7 @@ class es_indexer:
                 val = val.replace("\r", '')
                 val = val.replace("\t", '')
                 val = re.sub(pattern=r'([\"\\])', repl=r'\\\1', string=val)  # escape characters
-                mapping_str = mapping_str.replace(var, val)
+                mapping_str = mapping_str.replace('"'+var+'"', '"'+val+'"')
 
                 if es_id == var:
                    es_id = str(row[field])
