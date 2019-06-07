@@ -245,7 +245,7 @@ class es_indexer:
       try:
          cursor.execute(query)
 
-      except mysql.connector.errors.ProgrammingError as err:
+      except pymysql.err.ProgrammingError as err:
          print('SQL error', err, query)
 
       rows = cursor.fetchall();
@@ -418,7 +418,7 @@ class es_indexer:
          cursor.execute(sql)
          db.commit()
 
-      except mysql.connector.errors.ProgrammingError as err:
+      except pymysql.err.ProgrammingError as err:
          print('SQL error', err, query)
 
    ###########################################################
