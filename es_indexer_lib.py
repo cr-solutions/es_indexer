@@ -318,9 +318,12 @@ class es_indexer:
                 var = '$'+field
                 val = str(row[field])
 
-                val = val.replace("\n", '')  # remove linefeeds to not break JSON
-                val = val.replace("\r", '')
-                val = val.replace("\t", '')
+                # remove linefeeds, etc. to not break JSON
+                val = val.replace("\r\n", ' ')
+                val = val.replace("\n", ' ')
+                val = val.replace("\r", ' ')
+                val = val.replace("\t", ' ')
+                val = val.replace("\v", ' ')
                 val = re.sub(pattern=r'([\"\\])', repl=r'\\\1', string=val)  # escape characters
                 mapping_str = mapping_str.replace('"'+var+'"', '"'+val+'"')
 
