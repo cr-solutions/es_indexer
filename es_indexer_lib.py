@@ -78,6 +78,7 @@ class es_indexer:
       else:
          self._fs_getConfig()
 
+      self.upd_keys = []
 
       if self.debug:
          print("\r\nDebug "+inspect.currentframe().f_code.co_name+":\r\n", self.config_file, "\r\n", self.config, "\r\n\r\n", "#"*50, "\r\n")
@@ -421,14 +422,26 @@ class es_indexer:
 
       sql = 'UPDATE '+last_mod_field[0]+'.'+last_mod_field[1]+' SET '+last_mod_field[2]+' = "1970-01-01 00:00:00" WHERE '
 
+      i = 0
       for item in self.upd_keys:
-         sql += item+' OR '
+         last_mod_field_upd_key = item.split('=')
+         upd_key_name = last_mod_field_upd_key[0]
+         upd_key_val = last_mod_field_upd_key[1]
 
-      sql = sql[0:-4]
+         if i == 0:
+            sql += upd_key_name+' IN('+upd_key_val+','
+         else:
+            sql += upd_key_val + ','
+
+         i += 1
+
+      sql = sql[0:-1]
+      sql += ')'
 
 
       if self.debug:
-         print("\r\nDebug " + inspect.currentframe().f_code.co_name + ":\r\n", sql, "\r\n\r\n", "#" * 50, "\r\n")
+         print("\r\nDebug " + inspect.currentframe().f_code.co_name + ":\r\n", sql, "\r\n\r\n", "Key(s) to Update; "+str(len(self.upd_keys)), "\r\n", "#" * 50, "\r\n")
+
 
       try:
          cursor = db.cursor()
