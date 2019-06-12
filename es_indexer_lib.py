@@ -13,7 +13,7 @@
 # All Rights Reserved.
 
 
-import pymysql, boto3, json, traceback, urllib3, requests, inspect, os, sys, re, datetime, unicodedata
+import pymysql, boto3, json, traceback, urllib3, requests, inspect, os, sys, re, datetime
 
 ###########################################################
 ###########################################################
@@ -373,6 +373,7 @@ class es_indexer:
    ###########################################################
 
    def _es_bulk(self, json_byte):
+
       if self.debug:
          print("\r\nDebug " + inspect.currentframe().f_code.co_name + ":\r\n", str(json_byte,'utf-8'), "\r\n\r\n", "#" * 50, "\r\n")
 
@@ -470,8 +471,17 @@ class es_indexer:
 
    def _do(self):
       json_byte = self._mapping
-      self._es_bulk(json_byte)
 
+      if len(json_byte) > 0 and len(self.upd_keys) > 0:
+         self._es_bulk(json_byte)
+      elif self.debug:
+         print('Info: no data found for update index - JSON len:', len(json_byte), 'update key count:', len(self.upd_keys))
+
+
+   ###########################################################
+
+   def last_upd_count(self):
+      return len(self.upd_keys)
 
    ###########################################################
 
