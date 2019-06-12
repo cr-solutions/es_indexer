@@ -13,7 +13,7 @@
 # All Rights Reserved.
 
 
-import pymysql, boto3, json, traceback, urllib3, requests, inspect, os, sys, re
+import pymysql, boto3, json, traceback, urllib3, requests, inspect, os, sys, re, datetime, unicodedata
 
 ###########################################################
 ###########################################################
@@ -299,6 +299,7 @@ class es_indexer:
       upd_key_name = last_mod_field_upd_key[0]
       upd_key_var = last_mod_field_upd_key[1]
 
+
       if len(rows) > 0:
          fieldnames = rows[0].keys()
 
@@ -316,23 +317,34 @@ class es_indexer:
 
             for field in fieldnames:
                 var = '$'+field
+                ftype = type(row[field])
                 val = str(row[field])
 
-                # remove linefeeds, etc. to not break JSON
-                val = val.replace("\r\n", ' ')
-                val = val.replace("\n", ' ')
-                val = val.replace("\r", ' ')
-                val = val.replace("\t", ' ')
-                val = val.replace("\v", ' ')
-                val = re.sub(pattern=r'([\"\\])', repl=r'\\\1', string=val)  # escape characters
-                mapping_str = mapping_str.replace('"'+var+'"', '"'+val+'"')
+                # remove non printable chars, linefeeds etc.
+                val = re.sub(r'[\x00-\x1f\x7f-\x9f]', ' ', val)
+
+                # escape characters
+                val = re.sub(pattern=r'([\"\\])', repl=r'\\\1', string=val)
+
+                # dynamic field mapping for ES, https://www.elastic.co/guide/en/elasticsearch/reference/6.5/dynamic-field-mapping.html
+                if ftype == int or ftype == float:
+                   mapping_str = mapping_str.replace('"' + var + '"', val)
+                elif ftype == datetime.datetime:
+                   val = val.replace('-', '/')
+                   mapping_str = mapping_str.replace('"'+var+'"', '"'+val+'"')
+                elif ftype == bool:
+                   val = val.lower()
+                   mapping_str = mapping_str.replace('"'+var+'"', val)
+                elif row[field] is None:
+                   mapping_str = mapping_str.replace('"'+var+'"', 'null')
+                else:
+                   mapping_str = mapping_str.replace('"'+var+'"', '"'+val+'"')
 
                 if es_id == var:
                    es_id = str(row[field])
 
                 if upd_key_var == var:
                    upd_key_str = upd_key_name+'='+str(row[field])
-
 
 
             if es_id.find('$') != -1:
