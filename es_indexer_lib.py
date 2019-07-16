@@ -196,9 +196,13 @@ class es_indexer:
    def _sqlSelect(self):
       last_mod_field = ''
       data = ''
+      group_by = ''
+
       try:
          last_mod_field = self.config['sql']['last-modified-timestamp-field']
          data = self.config['sql']['data']
+         if 'group-by' in self.config['sql']:
+            group_by = self.config['sql']['group-by']
       except KeyError as err:
          raise UserWarning('JSON file ' + self.config_file + ' format error, missing key: '+str(err))
 
@@ -231,7 +235,10 @@ class es_indexer:
             query += ' LEFT JOIN ' + item["schema"] + '.' + item["table"] + ' ON ' + item["join"]
 
 
-         query += ' WHERE ' + last_mod_field + ' != "1970-01-01 00:00:00" ORDER BY '+last_mod_field+' ASC LIMIT '+str(self.bulklimit)
+         query += ' WHERE ' + last_mod_field + ' != "1970-01-01 00:00:00"'
+         if len(group_by) > 0:
+            query += ' GROUP BY ' + group_by
+         query += ' ORDER BY '+last_mod_field+' ASC LIMIT '+str(self.bulklimit)
 
       except KeyError as err:
          raise UserWarning('JSON file ' + self.config_file + ' format error, missing key: '+str(err))
@@ -243,6 +250,22 @@ class es_indexer:
 
    def _execSelect(self):
       db = self._rdsConnect()
+
+      if 'query-pre' in self.config['sql']:
+         try:
+            query_pre = self.config['sql']['query-pre']
+
+            if len(query_pre) > 0:
+               cursor = db.cursor()
+               cursor.execute(query_pre)
+               db.commit()
+
+               if self.debug:
+                  print("\r\nDebug " + inspect.currentframe().f_code.co_name + ":\r\n", query_pre, "\r\n\r\n", "#" * 50, "\r\n")
+
+         except pymysql.err.ProgrammingError as err:
+            print('SQL error', err, query_pre)
+
 
       cursor = db.cursor(pymysql.cursors.DictCursor)
       query = self._sqlSelect()
@@ -465,7 +488,7 @@ class es_indexer:
          db.commit()
 
       except pymysql.err.ProgrammingError as err:
-         print('SQL error', err, query)
+         print('SQL error', err, sql)
 
    ###########################################################
 
