@@ -1,6 +1,9 @@
 The class "es_indexer" can help you to add documents or
 database records from MySQL (MariaDB) via Python Version >= 3.6  to ES Index (Elasticsearch)
 
+All database field types are converted to comparable field types in Elasticsearch. 
+JSON strings in the database are directly supported as Elasticsearch JSON.
+
 You can use the indexer with public endpoints (RDS, ES, S3),
 private endpoints (via VPC) + NAT gateway required for boto3 with S3 or
 private endpoints with config on local filesystem instead of S3

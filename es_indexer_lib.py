@@ -361,7 +361,12 @@ class es_indexer:
                 elif row[field] is None:
                    mapping_str = mapping_str.replace('"'+var+'"', 'null')
                 else:
-                   mapping_str = mapping_str.replace('"'+var+'"', '"'+val+'"')
+                   if (   val.strip()[0:1] == '{' and val.strip()[-1] == '}' and val.find(':') != -1   ) or\
+                      (   val.strip()[0:1] == '[' and val.strip()[-1] == ']' and val.find(':') != -1 and val.find('{') != -1 and val.find('}') != -1   ):
+
+                      mapping_str = mapping_str.replace('"' + var + '"', row[field])
+                   else:
+                      mapping_str = mapping_str.replace('"'+var+'"', '"'+val+'"')
 
                 if es_id == var:
                    es_id = str(row[field])
