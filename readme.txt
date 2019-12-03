@@ -30,7 +30,7 @@ folder with source file of entry point, as sample "test_es_indexer.py"
                              es_indexer.py
                         config
                             |
-                             sample.json
+                             sample.es_indexer.config.json
 
 
 

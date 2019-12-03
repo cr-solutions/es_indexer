@@ -1,0 +1,41 @@
+{
+"rds":{
+   "endpoint":"mydatabase.c55rlhhdrfwl.eu-west-1.rds.amazonaws.com:3306",
+   "user":"myuser",
+   "password":"mypw"
+   },
+ "es":{
+   "endpoint":"https://myes-2ydp5bqfjfm2snkmyzkcszt4mi.eu-west-1.es.amazonaws.com:443"
+ },  
+ "sql":{
+   "_comment":"last-modified-timestamp-field as schema.table.fieldname, this field is used by WHERE to identify rows to be indexed (can be set auto. via CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP as sample), after successfully index-update this field will be set to 1970-01-01 00:00:00 via last-modified-timestamp-upd-key",
+   "last-modified-timestamp-field":"mydb.mytable.date_changed",   
+   "last-modified-timestamp-upd-key":"id=$id_user",
+   "query-pre": "SET SESSION group_concat_max_len = 2048;",
+   "group-by":"",
+   "data":[
+      {
+         "schema":"mydb",
+         "table":"mytable",
+         "fields":["id AS id_user", "firstname", "surname"]
+      },
+      {
+         "join":"mytable.id = mytableEx.id_user",
+         "schema":"mydb",
+         "table":"mytableEx",
+         "fields":["age"]
+      }
+   ]         
+ },
+ "mapping":
+ {
+   "_comment":"_id is the internal elasticsearch id field, _commant and _id will be removed from JSON transferred to ES",
+   "_id":"$id_user",
+   "_type":"_doc",
+   "id_user":"$id_user",
+   "firstname":"$firstname",   
+   "surname":"$surname",
+   "age":"$age",
+   "json_payload":"$json_payload"
+ }
+}

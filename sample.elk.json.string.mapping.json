@@ -1,0 +1,22 @@
+# if you like to use JSON strings (payload) from database, you must create a mapping for this fields (before first indexing)
+# all string fields with prefix json_ will be mapped as nasted type in elasticsearch
+
+PUT  _template/template_1
+{
+  "index_patterns": ["foo*"],
+  "mappings": {
+    "_doc": {
+       "dynamic_templates": [
+         {
+           "nested_field": {
+             "match_mapping_type": "*",
+             "match":   "json_*",
+             "mapping": {
+               "type": "nested"
+             }
+           }
+         }
+       ]
+     }
+  }
+}
