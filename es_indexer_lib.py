@@ -13,7 +13,8 @@
 # All Rights Reserved.
 
 
-import pymysql, boto3, json, traceback, urllib3, requests, inspect, os, sys, re, datetime
+import pymysql, boto3, json, traceback, urllib3, requests, inspect, os, sys, re, datetime, time, collections
+
 
 ###########################################################
 ###########################################################
@@ -39,17 +40,27 @@ class es_indexer:
 
    debug = False
 
+   measure = {}
+
+   offset = None
+
    ###########################################################
 
-   def __init__(self, s3bucket_filetype: str, s3prefix_folder: str, indexname: str, bulklimit: int, configfile: str = ''):
+   def __init__(self, s3bucket_filetype: str, s3prefix_folder: str, indexname: str, bulklimit: int,
+                configfile: str = '', offset: int = None):
+
       global ES_INDEXER_DEBUG
+
+      if os.environ.get('ES_INDEXER_DEBUG') is not None:
+         ES_INDEXER_DEBUG = bool(os.environ.get('ES_INDEXER_DEBUG'))
 
       try:
          if ES_INDEXER_DEBUG:
             self.debug = True
       except NameError:
-            pass
+         pass
 
+      self.measure = {}
 
       if s3bucket_filetype.find('s3://') != -1:
          self.s3bucket = s3bucket_filetype[5:]
@@ -60,7 +71,6 @@ class es_indexer:
       else:
          raise UserWarning('Error, parameter "s3bucket_filetype" must contain s3:// or file://')
 
-
       self.indexname = indexname
       self.bulklimit = bulklimit
       self.config_file = configfile
@@ -70,20 +80,43 @@ class es_indexer:
       if self.bulklimit < 1:
          self.bulklimit = 1
 
-      #print('debug', __class__, inspect.currentframe().f_back.f_lineno)
-      #return None
+
+      self.offset = offset
+
+      # print('debug', __class__, inspect.currentframe().f_back.f_lineno)
+      # return None
+
+      tick = time.process_time()
 
       if s3bucket_filetype.find('s3://') != -1:
          self._s3getConfig()
       else:
          self._fs_getConfig()
 
+
+      elapsed_time = time.process_time() - tick
+      self.measure['timings'] = {'config':elapsed_time}
+
       self.upd_keys = []
 
+
       if self.debug:
-         print("\r\nDebug "+inspect.currentframe().f_code.co_name+":\r\n", self.config_file, "\r\n", self.config, "\r\n\r\n", "#"*50, "\r\n")
+         print("\r\nDebug " + inspect.currentframe().f_code.co_name + ";\r\n", "Config File: " + self.config_file,
+               "\r\n", "Payload: " + json.dumps(self.config, sort_keys=True, indent=3), "\r\n\r\n", "#" * 50, "\r\n")
 
       self._do()
+
+      timeings = self.measure['timings']
+      total = 0
+      for key in timeings:
+         total += timeings[key]
+
+      self.measure['timings'].update({'total': total})
+
+      global ES_INDEXER_MEASURE
+      ES_INDEXER_MEASURE = self.measure
+
+
 
    ###########################################################
 
@@ -102,7 +135,6 @@ class es_indexer:
          else:
             config_file = self.folder + '/' + config_file
 
-
          config_file = os.path.realpath(os.path.dirname(os.path.abspath(__file__)) + '/../' + config_file)
 
          self.config_file = config_file
@@ -118,7 +150,6 @@ class es_indexer:
          self.config = json.loads(buf)
       except BaseException as err:
          raise UserWarning('JSON file ' + self.config_file + ' format error - ' + str(err))
-
 
    ###########################################################
 
@@ -139,19 +170,17 @@ class es_indexer:
 
          self.config_file = config_file
 
-
          s3 = boto3.resource('s3')
          obj = s3.Object(self.s3bucket, config_file)
          str = obj.get()['Body'].read().decode('utf-8')
       except BaseException as err:
-         raise UserWarning('Error read config from s3 bucket "' + self.s3bucket + '", File: "' + config_file + '" - ' + str(err))
-
+         raise UserWarning(
+            'Error read config from s3 bucket "' + self.s3bucket + '", File: "' + config_file + '" - ' + str(err))
 
       try:
          self.config = json.loads(str)
       except BaseException as err:
          raise UserWarning('JSON file ' + self.config_file + ' format error - ' + str(err))
-
 
    ###########################################################
 
@@ -183,11 +212,12 @@ class es_indexer:
          port = int(endpoint[1])
          endpoint = endpoint[0]
 
-
       try:
-         self.db = pymysql.connect(host=endpoint, port=port, user=user, passwd=pw, charset='utf8', connect_timeout=timeout)
+         self.db = pymysql.connect(host=endpoint, port=port, user=user, passwd=pw, charset='utf8',
+                                   connect_timeout=timeout)
       except pymysql.err.OperationalError as err:
-         raise UserWarning('Error , current timeout ' + str(timeout) + ', you can increase it via key timeout in the *.json file - ' + str(err))
+         raise UserWarning('Error , current timeout ' + str(
+            timeout) + ', you can increase it via key timeout in the *.json file - ' + str(err))
 
       return self.db
 
@@ -197,15 +227,25 @@ class es_indexer:
       last_mod_field = ''
       data = ''
       group_by = ''
+      sort = ''
+      additional_where = ''
 
       try:
          last_mod_field = self.config['sql']['last-modified-timestamp-field']
          data = self.config['sql']['data']
          if 'group-by' in self.config['sql']:
             group_by = self.config['sql']['group-by']
+         if 'sort' in self.config['sql']:
+            sort = self.config['sql']['sort']
+         if 'additional-where' in self.config['sql']:
+            additional_where = self.config['sql']['additional-where']
       except KeyError as err:
-         raise UserWarning('JSON file ' + self.config_file + ' format error, missing key: '+str(err))
+         raise UserWarning('JSON file ' + self.config_file + ' format error, missing key: ' + str(err))
 
+      if sort.upper() == 'DESC':
+         sort = 'DESC'
+      else:
+         sort = 'ASC'
 
       fields = ''
       tfrom = ''
@@ -225,24 +265,34 @@ class es_indexer:
 
                fields += schema_table + fname + ', '
 
-
             i += 1
-
 
          query = 'SELECT ' + fields[0:-2] + ' FROM ' + tfrom
 
          for item in joins:
             query += ' LEFT JOIN ' + item["schema"] + '.' + item["table"] + ' ON ' + item["join"]
 
+         if self.offset is None:
+            query += ' WHERE ' + last_mod_field + ' != "1970-01-01 00:00:00"'
 
-         query += ' WHERE ' + last_mod_field + ' != "1970-01-01 00:00:00"'
+         if len(additional_where) > 0:
+            if self.offset is None:
+               query += ' AND ' + additional_where
+            else:
+               query += ' WHERE ' + additional_where
+
+
          if len(group_by) > 0:
             query += ' GROUP BY ' + group_by
-         query += ' ORDER BY '+last_mod_field+' ASC LIMIT '+str(self.bulklimit)
+
+         offset = ''
+         if self.offset is not None:
+            offset = str(self.offset) + ', '
+
+         query += ' ORDER BY ' + last_mod_field + ' ' + sort + ' LIMIT ' +offset+ str(self.bulklimit)
 
       except KeyError as err:
-         raise UserWarning('JSON file ' + self.config_file + ' format error, missing key: '+str(err))
-
+         raise UserWarning('JSON file ' + self.config_file + ' format error, missing key: ' + str(err))
 
       return query
 
@@ -261,17 +311,20 @@ class es_indexer:
                db.commit()
 
                if self.debug:
-                  print("\r\nDebug " + inspect.currentframe().f_code.co_name + ":\r\n", query_pre, "\r\n\r\n", "#" * 50, "\r\n")
+                  print("\r\nDebug " + inspect.currentframe().f_code.co_name + ";\r\n", "Query-Pre: " + query_pre,
+                        "\r\n\r\n", "#" * 50, "\r\n")
 
          except pymysql.err.ProgrammingError as err:
             print('SQL error', err, query_pre)
-
 
       cursor = db.cursor(pymysql.cursors.DictCursor)
       query = self._sqlSelect()
 
       if self.debug:
-         print("\r\nDebug " + inspect.currentframe().f_code.co_name + ":\r\n", query, "\r\n\r\n", "#" * 50, "\r\n")
+         print("\r\nDebug " + inspect.currentframe().f_code.co_name + ";\r\n", "Query: " + query, "\r\n\r\n", "#" * 50,
+               "\r\n")
+
+      tick = time.process_time()
 
       try:
          cursor.execute(query)
@@ -280,6 +333,12 @@ class es_indexer:
          print('SQL error', err, query)
 
       rows = cursor.fetchall();
+
+      elapsed_time = time.process_time() - tick
+      self.measure['timings'].update({'sql_select': elapsed_time})
+
+      self.measure['indexed'] = len(rows)
+
       return rows
 
    ###########################################################
@@ -297,16 +356,13 @@ class es_indexer:
          mapping = self.config["mapping"]
          last_mod_field_upd_key = self.config['sql']['last-modified-timestamp-upd-key']
       except KeyError as err:
-         raise UserWarning('JSON file ' + self.config_file + ' format error, missing key: '+str(err))
-
+         raise UserWarning('JSON file ' + self.config_file + ' format error, missing key: ' + str(err))
 
       if not '_id' in mapping:
          raise UserWarning('internal ES _id mapping is missing')
 
-
       es_id_var_name = mapping['_id']
       del mapping['_id']
-
 
       if not '_type' in mapping:
          raise UserWarning('internal ES _type mapping is missing')
@@ -317,11 +373,11 @@ class es_indexer:
       if last_mod_field_upd_key.find('=') == -1:
          raise UserWarning('last-modified-timestamp-upd-key, missing variable allocation like: id=$id_doc')
 
-
       last_mod_field_upd_key = last_mod_field_upd_key.split('=')
       upd_key_name = last_mod_field_upd_key[0]
       upd_key_var = last_mod_field_upd_key[1]
 
+      tick = time.process_time()
 
       if len(rows) > 0:
          fieldnames = rows[0].keys()
@@ -334,54 +390,53 @@ class es_indexer:
             if '_comment' in mapping:
                del mapping['_comment']
 
-
             mapping_str = json.dumps(mapping)
             upd_key_str = ''
 
             for field in fieldnames:
-                var = '$'+field
-                ftype = type(row[field])
-                val = str(row[field])
+               var = '$' + field
+               ftype = type(row[field])
+               val = str(row[field])
 
-                # remove non printable chars, linefeeds etc.
-                val = re.sub(r'[\x00-\x1f\x7f-\x9f]', ' ', val)
+               # remove non printable chars, linefeeds etc.
+               val = re.sub(r'[\x00-\x1f\x7f-\x9f]', ' ', val)
 
-                # escape characters
-                val = re.sub(pattern=r'([\"\\])', repl=r'\\\1', string=val)
+               # escape characters
+               val = re.sub(pattern=r'([\"\\])', repl=r'\\\1', string=val)
 
-                # dynamic field mapping for ES, https://www.elastic.co/guide/en/elasticsearch/reference/6.5/dynamic-field-mapping.html
-                if ftype == int or ftype == float:
-                   mapping_str = mapping_str.replace('"' + var + '"', val)
-                elif ftype == datetime.datetime:
-                   val = val.replace('-', '/')
-                   mapping_str = mapping_str.replace('"'+var+'"', '"'+val+'"')
-                elif ftype == bool:
-                   val = val.lower()
-                   mapping_str = mapping_str.replace('"'+var+'"', val)
-                elif row[field] is None:
-                   mapping_str = mapping_str.replace('"'+var+'"', 'null')
-                else:
-                   if (   val.strip()[0:1] == '{' and val.strip()[-1] == '}' and val.find(':') != -1   ) or\
-                      (   val.strip()[0:1] == '[' and val.strip()[-1] == ']' and val.find(':') != -1 and val.find('{') != -1 and val.find('}') != -1   ):
+               # dynamic field mapping for ES, https://www.elastic.co/guide/en/elasticsearch/reference/6.5/dynamic-field-mapping.html
+               if ftype == int or ftype == float:
+                  mapping_str = mapping_str.replace('"' + var + '"', val)
+               elif ftype == datetime.datetime:
+                  val = val.replace('-', '/')
+                  mapping_str = mapping_str.replace('"' + var + '"', '"' + val + '"')
+               elif ftype == bool:
+                  val = val.lower()
+                  mapping_str = mapping_str.replace('"' + var + '"', val)
+               elif row[field] is None:
+                  mapping_str = mapping_str.replace('"' + var + '"', 'null')
+               else:
+                  if (val.strip()[0:1] == '{' and val.strip()[-1] == '}' and val.find(':') != -1) or (
+                          val.strip()[0:1] == '[' and val.strip()[-1] == ']' and val.find(':') != -1 and val.find(
+                     '{') != -1 and val.find('}') != -1):
 
-                      mapping_str = mapping_str.replace('"' + var + '"', row[field])
-                   else:
-                      mapping_str = mapping_str.replace('"'+var+'"', '"'+val+'"')
+                     mapping_str = mapping_str.replace('"' + var + '"', row[field])
+                  else:
+                     mapping_str = mapping_str.replace('"' + var + '"', '"' + val + '"')
 
-                if es_id == var:
-                   es_id = str(row[field])
+               if es_id == var:
+                  es_id = str(row[field])
 
-                if upd_key_var == var:
-                   upd_key_str = upd_key_name+'='+str(row[field])
-
+               if upd_key_var == var:
+                  upd_key_str = upd_key_name + '=' + str(row[field])
 
             if es_id.find('$') != -1:
                raise UserWarning('no database field for internal ES _id mapping found')
 
+            action = '{"index":{"_index":"' + self.indexname + '", "_type":"' + es_type + '", "_id":"' + es_id + '"}}' + "\n"
 
-            action = '{"index":{"_index":"'+self.indexname+'", "_type":"'+es_type+'", "_id":"'+es_id+'"}}' + "\n"
-
-            if (sys.getsizeof(json_str) + sys.getsizeof(action) + sys.getsizeof(mapping_str)) > 1024 * 1024 * 5:  # max. MB size for bulk
+            if (sys.getsizeof(json_str) + sys.getsizeof(action) + sys.getsizeof(
+                    mapping_str)) > 1024 * 1024 * 5:  # max. MB size for bulk
                break
 
             json_str += action
@@ -389,12 +444,13 @@ class es_indexer:
 
             self.upd_keys.append(upd_key_str)
 
-
+      elapsed_time = time.process_time() - tick
+      self.measure['timings'].update({'mapping': elapsed_time})
 
       json_byte = json_str.encode('utf-8')
       # for debug
-      #print(json_byte)
-      #return False
+      # print(json_byte)
+      # return False
 
       return json_byte
 
@@ -403,7 +459,8 @@ class es_indexer:
    def _es_bulk(self, json_byte):
 
       if self.debug:
-         print("\r\nDebug " + inspect.currentframe().f_code.co_name + ":\r\n", str(json_byte,'utf-8'), "\r\n\r\n", "#" * 50, "\r\n")
+         print("\r\nDebug " + inspect.currentframe().f_code.co_name + ";\r\n", "Payload: " + str(json_byte, 'utf-8'),
+               "\r\n\r\n", "#" * 50, "\r\n")
 
       headers = {"Content-Type": "application/json; charset=utf-8"}
 
@@ -411,7 +468,7 @@ class es_indexer:
       try:
          endpoint = self.config['es']['endpoint']
       except KeyError as err:
-         raise UserWarning('JSON file ' + self.config_file + ' format error, missing key: '+str(err))
+         raise UserWarning('JSON file ' + self.config_file + ' format error, missing key: ' + str(err))
 
       timeout = None
       try:
@@ -420,23 +477,26 @@ class es_indexer:
          timeout = 3
          pass
 
+      urllib3.disable_warnings(
+         urllib3.exceptions.InsecureRequestWarning)  # to support local ES endpoints via SSH tunnel, sample: https://127.0.0.1:9200
 
-      urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)  # to support local ES endpoints via SSH tunnel, sample: https://127.0.0.1:9200
+      tick = time.process_time()
 
       res = None
       try:
-         res = requests.put(url=endpoint+'/_bulk', verify=False, data=json_byte,  headers=headers, timeout=timeout)
+         res = requests.put(url=endpoint + '/_bulk', verify=False, data=json_byte, headers=headers, timeout=timeout)
       except requests.exceptions.ConnectionError as err:
-         raise UserWarning('Connect Error '+str(err))
+         raise UserWarning('Connect Error ' + str(err))
       except requests.exceptions.ReadTimeout as err:
-         raise UserWarning('HTTP Read Error, current timeout ' + str(timeout) + ', you can increase it via key timeout in the *.json file - ' + str(err))
+         raise UserWarning('HTTP Read Error, current timeout ' + str(
+            timeout) + ', you can increase it via key timeout in the *.json file - ' + str(err))
 
       resJSON = json.loads(res.text)
 
       try:
          msg = ''
          msg += "\r\n\r\nRequest:\r\n"
-         msg += str(json_byte,'utf-8')
+         msg += str(json_byte, 'utf-8')
          msg += "\r\n\r\nResponse:\r\n"
          msg += res.text
 
@@ -444,11 +504,13 @@ class es_indexer:
             raise UserWarning('HTTP Error ' + str(res.status_code) + msg)
 
          if resJSON['errors'] != False:
-            raise UserWarning('Error add/update index '+msg)
+            raise UserWarning('Error add/update index ' + msg)
 
       except KeyError as err:
-         raise UserWarning('JSON response format error, missing key: '+str(err)+"\r\n\r\n"+msg)
+         raise UserWarning('JSON response format error, missing key: ' + str(err) + "\r\n\r\n" + msg)
 
+      elapsed_time = time.process_time() - tick
+      self.measure['timings'].update({'es_bulk': elapsed_time})
 
       self._sqlUpd()
 
@@ -463,8 +525,8 @@ class es_indexer:
       if len(last_mod_field) != 3:
          raise UserWarning('format error, <schema>.<table>.<field>')
 
-
-      sql = 'UPDATE '+last_mod_field[0]+'.'+last_mod_field[1]+' SET '+last_mod_field[2]+' = "1970-01-01 00:00:00" WHERE '
+      sql = 'UPDATE ' + last_mod_field[0] + '.' + last_mod_field[1] + ' SET ' + last_mod_field[
+         2] + ' = "1970-01-01 00:00:00" WHERE '
 
       i = 0
       for item in self.upd_keys:
@@ -473,7 +535,7 @@ class es_indexer:
          upd_key_val = last_mod_field_upd_key[1]
 
          if i == 0:
-            sql += upd_key_name+' IN('+upd_key_val+','
+            sql += upd_key_name + ' IN(' + upd_key_val + ','
          else:
             sql += upd_key_val + ','
 
@@ -482,10 +544,11 @@ class es_indexer:
       sql = sql[0:-1]
       sql += ')'
 
-
       if self.debug:
-         print("\r\nDebug " + inspect.currentframe().f_code.co_name + ":\r\n", sql, "\r\n\r\n", "Key(s) to Update; "+str(len(self.upd_keys)), "\r\n", "#" * 50, "\r\n")
+         print("\r\nDebug " + inspect.currentframe().f_code.co_name + ";\r\n", sql, "\r\n\r\n",
+               "Key(s) to Update; " + str(len(self.upd_keys)), "\r\n", "#" * 50, "\r\n")
 
+      tick = time.process_time()
 
       try:
          cursor = db.cursor()
@@ -495,6 +558,9 @@ class es_indexer:
       except pymysql.err.ProgrammingError as err:
          print('SQL error', err, sql)
 
+      elapsed_time = time.process_time() - tick
+      self.measure['timings'].update({'sql_update': elapsed_time})
+
    ###########################################################
 
    def _do(self):
@@ -503,13 +569,8 @@ class es_indexer:
       if len(json_byte) > 0 and len(self.upd_keys) > 0:
          self._es_bulk(json_byte)
       elif self.debug:
-         print('Info: no data found for update index - JSON len:', len(json_byte), 'update key count:', len(self.upd_keys))
-
-
-   ###########################################################
-
-   def last_upd_count(self):
-      return len(self.upd_keys)
+         print('Info: no data found for update index - JSON len:', len(json_byte), 'update key count:',
+               len(self.upd_keys))
 
    ###########################################################
 
@@ -525,7 +586,9 @@ class es_indexer:
 
    ###########################################################
 
-
+   def measure():
+      global ES_INDEXER_DEBUG
+      return ES_INDEXER_MEASURE
 
 ###########################################################
 ###########################################################

@@ -13,6 +13,8 @@
    "last-modified-timestamp-upd-key":"id=$id_user",
    "query-pre": "SET SESSION group_concat_max_len = 2048;",
    "group-by":"",
+   "sort": "ASC",
+   "additional-where": "",
    "data":[
       {
          "schema":"mydb",

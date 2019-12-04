@@ -43,7 +43,7 @@ def lambda_handler(event, context):
 
    ###
    # cut from here for Lambda
-   import time, datetime, traceback
+   import time, datetime, traceback, os
    from libs.es_indexer_lib import es_indexer
 
    print('start ' + time.strftime("%Y-%m-%d %H:%M"))
@@ -55,6 +55,34 @@ def lambda_handler(event, context):
       es_indexer('s3://my-bucket', 'config', 'test', 5) # without filename, the class search for a config file like test.json
 
       es_indexer('file://', 'config', 'index1', 10, 'index1.json')
+
+      print(es_indexer.measure())  # to get output on screen or CloudWatch Logs
+
+      ####################################################################
+
+      # sample use full index if not lambda (started as sample from EC2)
+      if os.environ.get('AWS_REGION') is None:
+
+         es_indexer.disable_debug()
+         offset = 0
+         limit = 1000
+         time = 0
+         rows_left_to_upd = True
+         while rows_left_to_upd:
+            es_indexer('file://', 'config', 'index1', limit, 'index1.json', offset)
+
+            measure = es_indexer.measure()
+            time += measure['timings']['total']
+
+            offset += limit
+
+            if offset % 3000 == 0:
+               print("Offset: "+str(offset)+"\r\n")
+               print(time)
+               time = 0
+
+            if measure['indexed'] == 0:  # stop if no more records to index
+               rows_left_to_upd = False
 
    except UserWarning as err: # exceptions raised from the class
       print('Error', err)
