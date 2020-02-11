@@ -86,7 +86,7 @@ class es_indexer:
       # print('debug', __class__, inspect.currentframe().f_back.f_lineno)
       # return None
 
-      tick = time.process_time()
+      tick = time.time()
 
       if s3bucket_filetype.find('s3://') != -1:
          self._s3getConfig()
@@ -94,7 +94,7 @@ class es_indexer:
          self._fs_getConfig()
 
 
-      elapsed_time = time.process_time() - tick
+      elapsed_time = time.time() - tick
       self.measure['timings'] = {'config':elapsed_time}
 
       self.upd_keys = []
@@ -324,7 +324,7 @@ class es_indexer:
          print("\r\nDebug " + inspect.currentframe().f_code.co_name + ";\r\n", "Query: " + query, "\r\n\r\n", "#" * 50,
                "\r\n")
 
-      tick = time.process_time()
+      tick = time.time()
 
       try:
          cursor.execute(query)
@@ -334,7 +334,7 @@ class es_indexer:
 
       rows = cursor.fetchall();
 
-      elapsed_time = time.process_time() - tick
+      elapsed_time = time.time() - tick
       self.measure['timings'].update({'sql_select': elapsed_time})
 
       self.measure['indexed'] = len(rows)
@@ -377,7 +377,7 @@ class es_indexer:
       upd_key_name = last_mod_field_upd_key[0]
       upd_key_var = last_mod_field_upd_key[1]
 
-      tick = time.process_time()
+      tick = time.time()
 
       if len(rows) > 0:
          fieldnames = rows[0].keys()
@@ -444,7 +444,7 @@ class es_indexer:
 
             self.upd_keys.append(upd_key_str)
 
-      elapsed_time = time.process_time() - tick
+      elapsed_time = time.time() - tick
       self.measure['timings'].update({'mapping': elapsed_time})
 
       json_byte = json_str.encode('utf-8')
@@ -480,7 +480,7 @@ class es_indexer:
       urllib3.disable_warnings(
          urllib3.exceptions.InsecureRequestWarning)  # to support local ES endpoints via SSH tunnel, sample: https://127.0.0.1:9200
 
-      tick = time.process_time()
+      tick = time.time()
 
       res = None
       try:
@@ -509,7 +509,7 @@ class es_indexer:
       except KeyError as err:
          raise UserWarning('JSON response format error, missing key: ' + str(err) + "\r\n\r\n" + msg)
 
-      elapsed_time = time.process_time() - tick
+      elapsed_time = time.time() - tick
       self.measure['timings'].update({'es_bulk': elapsed_time})
 
       self._sqlUpd()
@@ -548,7 +548,7 @@ class es_indexer:
          print("\r\nDebug " + inspect.currentframe().f_code.co_name + ";\r\n", sql, "\r\n\r\n",
                "Key(s) to Update; " + str(len(self.upd_keys)), "\r\n", "#" * 50, "\r\n")
 
-      tick = time.process_time()
+      tick = time.time()
 
       try:
          cursor = db.cursor()
@@ -558,7 +558,7 @@ class es_indexer:
       except pymysql.err.ProgrammingError as err:
          print('SQL error', err, sql)
 
-      elapsed_time = time.process_time() - tick
+      elapsed_time = time.time() - tick
       self.measure['timings'].update({'sql_update': elapsed_time})
 
    ###########################################################
