@@ -66,20 +66,20 @@ def lambda_handler(event, context):
          es_indexer.disable_debug()
          offset = 0
          limit = 1000
-         time = 0
+         duration = 0
          rows_left_to_upd = True
          while rows_left_to_upd:
             es_indexer('file://', 'config', 'index1', limit, 'index1.json', offset)
 
             measure = es_indexer.measure()
-            time += measure['timings']['total']
+            duration += measure['timings']['total']
 
             offset += limit
 
             if offset % 3000 == 0:
                print("Offset: "+str(offset)+"\r\n")
-               print(time)
-               time = 0
+               print(duration)
+               duration = 0
 
             if measure['indexed'] == 0:  # stop if no more records to index
                rows_left_to_upd = False
