@@ -8,13 +8,15 @@
    "endpoint":"https://myes-2ydp5bqfjfm2snkmyzkcszt4mi.eu-west-1.es.amazonaws.com:443"
  },  
  "sql":{
-   "_comment":"last-modified-timestamp-field as schema.table.fieldname, this field is used by WHERE to identify rows to be indexed (can be set auto. via CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP as sample), after successfully index-update this field will be set to 1970-01-01 00:00:00 via last-modified-timestamp-upd-key",
+   "_comment-last-modified-timestamp-field":"last-modified-timestamp-field as schema.table.fieldname, this field is used by WHERE to identify rows to be indexed (can be set auto. via CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP as sample), after successfully index-update this field will be set to 1970-01-01 00:00:00 via last-modified-timestamp-upd-key, the WHERE on last-modified-timestamp-upd-key is not used if the class is called with offset for full indexing",
    "last-modified-timestamp-field":"mydb.mytable.date_changed",   
    "last-modified-timestamp-upd-key":"id=$id_user",
    "query-pre": "SET SESSION group_concat_max_len = 2048;",
    "group-by":"",
    "sort": "ASC",
    "additional-where": "",
+   "_comment-additional-primary-key-for-full-indexing":"in case of full indexing, this increase the performance because it will be used as natural offset as sample by WHERE mydb.mytable,id >= [id] AND mydb.mytable,id <= [id]    (id must be numceric)",
+   "additional-primary-key-for-full-indexing": "mydb.mytable.id",
    "data":[
       {
          "schema":"mydb",
@@ -26,6 +28,13 @@
          "schema":"mydb",
          "table":"mytableEx",
          "fields":["age"]
+      },
+      {
+         "_comment-extended-join":"you can use extended joins for reference tables too",
+         "join":"LEFT JOIN mydb.addr ON addr.id=ref_addr.id_addr ON ref_addr.id_user = mydb.mytable.id",
+         "schema":"pm",
+         "table":"ref_addr",
+         "fields":["IF(GROUP_CONCAT(DISTINCT addr.city) IS NULL, '', REPLACE(CONCAT(',', GROUP_CONCAT(DISTINCT addr.city)),',',' city_'))  AS cities"]
       }
    ]         
  },

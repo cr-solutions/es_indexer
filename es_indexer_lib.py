@@ -229,6 +229,7 @@ class es_indexer:
       group_by = ''
       sort = ''
       additional_where = ''
+      additional_primary_key_for_full_indexing = ''
 
       try:
          last_mod_field = self.config['sql']['last-modified-timestamp-field']
@@ -239,6 +240,8 @@ class es_indexer:
             sort = self.config['sql']['sort']
          if 'additional-where' in self.config['sql']:
             additional_where = self.config['sql']['additional-where']
+         if 'additional-primary-key-for-full-indexing' in self.config['sql']:
+            additional_primary_key_for_full_indexing = self.config['sql']['additional-primary-key-for-full-indexing']
       except KeyError as err:
          raise UserWarning('JSON file ' + self.config_file + ' format error, missing key: ' + str(err))
 
@@ -270,10 +273,17 @@ class es_indexer:
          query = 'SELECT ' + fields[0:-2] + ' FROM ' + tfrom
 
          for item in joins:
-            query += ' LEFT JOIN ' + item["schema"] + '.' + item["table"] + ' ON ' + item["join"]
+            query += ' LEFT JOIN ' + item["schema"] + '.' + item["table"]
+            if item["join"].upper().find('ON') == -1:
+               query += ' ON ' + item["join"]
+            else:
+               query += ' '+item["join"]
 
          if self.offset is None:
             query += ' WHERE ' + last_mod_field + ' != "1970-01-01 00:00:00"'
+         else:
+            if len(additional_primary_key_for_full_indexing) > 0:
+               query += ' WHERE ' + additional_primary_key_for_full_indexing + ' >= ' + str(self.offset) + ' AND ' + additional_primary_key_for_full_indexing + ' <= ' + str(self.offset + self.bulklimit)
 
          if len(additional_where) > 0:
             if self.offset is None:
@@ -285,14 +295,12 @@ class es_indexer:
          if len(group_by) > 0:
             query += ' GROUP BY ' + group_by
 
-         offset = ''
-         if self.offset is not None:
-            offset = str(self.offset) + ', '
 
-         query += ' ORDER BY ' + last_mod_field + ' ' + sort + ' LIMIT ' +offset+ str(self.bulklimit)
+         query += ' ORDER BY ' + last_mod_field + ' ' + sort + ' LIMIT ' + str(self.bulklimit)
 
       except KeyError as err:
          raise UserWarning('JSON file ' + self.config_file + ' format error, missing key: ' + str(err))
+
 
       return query
 
