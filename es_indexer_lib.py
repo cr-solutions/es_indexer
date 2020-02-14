@@ -296,7 +296,12 @@ class es_indexer:
             query += ' GROUP BY ' + group_by
 
 
-         query += ' ORDER BY ' + last_mod_field + ' ' + sort + ' LIMIT ' + str(self.bulklimit)
+         offset = ''
+         if self.offset is not None and len(additional_primary_key_for_full_indexing) == 0: # use OFFSET/LIMIT only if not possible via PK
+            offset = str(self.offset) + ', '
+
+         query += ' ORDER BY ' + last_mod_field + ' ' + sort + ' LIMIT ' + offset + str(self.bulklimit)
+
 
       except KeyError as err:
          raise UserWarning('JSON file ' + self.config_file + ' format error, missing key: ' + str(err))
