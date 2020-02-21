@@ -274,7 +274,7 @@ class es_indexer:
 
          for item in joins:
             query += ' LEFT JOIN ' + item["schema"] + '.' + item["table"]
-            if item["join"].upper().find('ON') == -1:
+            if item["join"].upper().find(' ON ') == -1:
                query += ' ON ' + item["join"]
             else:
                query += ' '+item["join"]
