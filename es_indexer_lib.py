@@ -429,12 +429,13 @@ class es_indexer:
                elif row[field] is None:
                   mapping_str = mapping_str.replace('"' + var + '"', 'null')
                else:
-                  if \
-                          (val.strip()[0:1] == '{' and val.strip()[-1] == '}' and val.find(':') != -1) \
-                          or (val.strip()[0:1] == '[' and val.strip()[-1] == ']' and val.find(':') != -1 and val.find(
-                     '{') != -1 and val.find('}') != -1) \
-                          or (val.strip()[0:1] == '[' and val.strip()[-1] == ']'):
+                  is_json = True
+                  try:
+                     json.loads(row[field])
+                  except ValueError as e:
+                     is_json = False
 
+                  if is_json and val != 'Infinity':  # 'Infinity' string is a special case for JSON
                      mapping_str = mapping_str.replace('"' + var + '"', row[field])
                   else:
                      mapping_str = mapping_str.replace('"' + var + '"', '"' + val + '"')
