@@ -493,19 +493,40 @@ class es_indexer:
          timeout = 3
          pass
 
+      retry = None
+      try:
+         retry = int(self.config['es']['retry'])
+      except KeyError as err:
+         retry = 1
+         pass
+
+      retry_wait_sec = None
+      try:
+         retry_wait_sec = int(self.config['es']['retry_wait_sec'])
+      except KeyError as err:
+         retry_wait_sec = 1
+         pass
+
       urllib3.disable_warnings(
          urllib3.exceptions.InsecureRequestWarning)  # to support local ES endpoints via SSH tunnel, sample: https://127.0.0.1:9200
 
       tick = time.time()
 
       res = None
-      try:
-         res = requests.put(url=endpoint + '/_bulk', verify=False, data=json_byte, headers=headers, timeout=timeout)
-      except requests.exceptions.ConnectionError as err:
-         raise UserWarning('Connect Error ' + str(err))
-      except requests.exceptions.ReadTimeout as err:
-         raise UserWarning('HTTP Read Error, current timeout ' + str(
-            timeout) + ', you can increase it via key timeout in the *.json file - ' + str(err))
+      for x in range(1, retry):
+         try:
+            res = requests.put(url=endpoint + '/_bulk', verify=False, data=json_byte, headers=headers, timeout=timeout)
+            break
+         except requests.exceptions.ConnectionError as err:
+            raise UserWarning('Connect Error ' + str(err))
+         except requests.exceptions.ReadTimeout as err:
+            if(x < retry):
+               time.sleep(retry_wait_sec)
+               continue
+            else:
+               raise UserWarning('HTTP Read Error, current timeout ' + str(
+                  timeout) + ', you can increase it via key timeout in the *.json file - ' + str(err))
+
 
       resJSON = json.loads(res.text)
 

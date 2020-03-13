@@ -2,10 +2,15 @@
 "rds":{
    "endpoint":"mydatabase.c55rlhhdrfwl.eu-west-1.rds.amazonaws.com:3306",
    "user":"myuser",
-   "password":"mypw"
+   "password":"mypw",
+   "retry": 3
    },
  "es":{
-   "endpoint":"https://myes-2ydp5bqfjfm2snkmyzkcszt4mi.eu-west-1.es.amazonaws.com:443"
+   "endpoint":"https://myes-2ydp5bqfjfm2snkmyzkcszt4mi.eu-west-1.es.amazonaws.com:443",
+   "timeout":5,
+   "_comment-retry": "retry last indexing bulk on http read error",
+   "retry": 1,
+   "retry_wait_sec": 2
  },  
  "sql":{
    "_comment-last-modified-timestamp-field":"last-modified-timestamp-field as schema.table.fieldname, this field is used by WHERE to identify rows to be indexed (can be set auto. via CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP as sample), after successfully index-update this field will be set to 1970-01-01 00:00:00 via last-modified-timestamp-upd-key, the WHERE on last-modified-timestamp-upd-key is not used if the class is called with offset for full indexing",
