@@ -80,7 +80,6 @@ class es_indexer:
       if self.bulklimit < 1:
          self.bulklimit = 1
 
-
       self.offset = offset
 
       # print('debug', __class__, inspect.currentframe().f_back.f_lineno)
@@ -93,12 +92,10 @@ class es_indexer:
       else:
          self._fs_getConfig()
 
-
       elapsed_time = time.time() - tick
-      self.measure['timings'] = {'config':elapsed_time}
+      self.measure['timings'] = {'config': elapsed_time}
 
       self.upd_keys = []
-
 
       if self.debug:
          print("\r\nDebug " + inspect.currentframe().f_code.co_name + ";\r\n", "Config File: " + self.config_file,
@@ -115,8 +112,6 @@ class es_indexer:
 
       global ES_INDEXER_MEASURE
       ES_INDEXER_MEASURE = self.measure
-
-
 
    ###########################################################
 
@@ -277,13 +272,15 @@ class es_indexer:
             if item["join"].upper().find(' ON ') == -1:
                query += ' ON ' + item["join"]
             else:
-               query += ' '+item["join"]
+               query += ' ' + item["join"]
 
          if self.offset is None:
             query += ' WHERE ' + last_mod_field + ' != "1970-01-01 00:00:00"'
          else:
             if len(additional_primary_key_for_full_indexing) > 0:
-               query += ' WHERE ' + additional_primary_key_for_full_indexing + ' >= ' + str(self.offset) + ' AND ' + additional_primary_key_for_full_indexing + ' <= ' + str(self.offset + self.bulklimit)
+               query += ' WHERE ' + additional_primary_key_for_full_indexing + ' >= ' + str(
+                  self.offset) + ' AND ' + additional_primary_key_for_full_indexing + ' <= ' + str(
+                  self.offset + self.bulklimit)
 
          if len(additional_where) > 0:
             if self.offset is None:
@@ -291,13 +288,12 @@ class es_indexer:
             else:
                query += ' WHERE ' + additional_where
 
-
          if len(group_by) > 0:
             query += ' GROUP BY ' + group_by
 
-
          offset = ''
-         if self.offset is not None and len(additional_primary_key_for_full_indexing) == 0: # use OFFSET/LIMIT only if not possible via PK
+         if self.offset is not None and len(
+                 additional_primary_key_for_full_indexing) == 0:  # use OFFSET/LIMIT only if not possible via PK
             offset = str(self.offset) + ', '
 
          query += ' ORDER BY ' + last_mod_field + ' ' + sort + ' LIMIT ' + offset + str(self.bulklimit)
@@ -305,7 +301,6 @@ class es_indexer:
 
       except KeyError as err:
          raise UserWarning('JSON file ' + self.config_file + ' format error, missing key: ' + str(err))
-
 
       return query
 
@@ -496,6 +491,10 @@ class es_indexer:
       retry = None
       try:
          retry = int(self.config['es']['retry'])
+
+         if retry < 1:
+            retry = 1
+
       except KeyError as err:
          retry = 1
          pass
@@ -513,20 +512,26 @@ class es_indexer:
       tick = time.time()
 
       res = None
-      for x in range(1, retry):
+      x = 0
+      for x in range(0, retry):
          try:
             res = requests.put(url=endpoint + '/_bulk', verify=False, data=json_byte, headers=headers, timeout=timeout)
             break
          except requests.exceptions.ConnectionError as err:
             raise UserWarning('Connect Error ' + str(err))
          except requests.exceptions.ReadTimeout as err:
-            if(x < retry):
+            if x < retry:
+               if self.debug:
+                  print("\r\nDebug " + inspect.currentframe().f_code.co_name + ";\r\n", "Read Timeout, retry ..", "\r\n\r\n",
+                        "#" * 50, "\r\n")
                time.sleep(retry_wait_sec)
                continue
             else:
                raise UserWarning('HTTP Read Error, current timeout ' + str(
                   timeout) + ', you can increase it via key timeout in the *.json file - ' + str(err))
-
+         except:
+            print("Unexpected error:", sys.exc_info()[0])
+            raise
 
       resJSON = json.loads(res.text)
 
