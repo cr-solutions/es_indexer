@@ -518,19 +518,19 @@ class es_indexer:
             res = requests.put(url=endpoint + '/_bulk', verify=False, data=json_byte, headers=headers, timeout=timeout)
             break
          except requests.exceptions.ConnectionError as err:
-            raise UserWarning('Connect Error ' + str(err))
+            raise UserWarning('Connect Error: ' + str(err))
          except requests.exceptions.ReadTimeout as err:
-            if x < retry:
+            if x < retry-1:
                if self.debug:
-                  print("\r\nDebug " + inspect.currentframe().f_code.co_name + ";\r\n", "Read Timeout, retry ..", "\r\n\r\n",
+                  print("\r\nDebug " + inspect.currentframe().f_code.co_name + ";\r\n", "Read Timeout, retry in ", str(retry_wait_sec), "sec. ...", "\r\n\r\n",
                         "#" * 50, "\r\n")
                time.sleep(retry_wait_sec)
                continue
             else:
-               raise UserWarning('HTTP Read Error, current timeout ' + str(
+               raise UserWarning('HTTP Read Error:, current timeout ' + str(
                   timeout) + ', you can increase it via key timeout in the *.json file - ' + str(err))
-         except:
-            print("Unexpected error:", sys.exc_info()[0])
+         except Exception as err:
+            print('Unexpected error: ' + str(err))
             raise
 
       resJSON = json.loads(res.text)
