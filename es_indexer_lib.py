@@ -410,7 +410,7 @@ class es_indexer:
                val = re.sub(r'[\x00-\x1f\x7f-\x9f]', ' ', val)
 
                # escape characters
-               val = re.sub(pattern=r'([\"\\])', repl=r'\\\1', string=val)
+               ##val = re.sub(pattern=r'([\"\\])', repl=r'\\\1', string=val)
 
                # dynamic field mapping for ES, https://www.elastic.co/guide/en/elasticsearch/reference/6.5/dynamic-field-mapping.html
                if ftype == int or ftype == float:
@@ -433,6 +433,10 @@ class es_indexer:
                   if is_json and val != 'Infinity':  # 'Infinity' string is a special case for JSON
                      mapping_str = mapping_str.replace('"' + var + '"', row[field])
                   else:
+                     # escape characters
+                     ELK_SPECIAL = '+ - & | ! ( ) { } [ ] ^ " ~ * ? : \\'.split(' ')
+                     re.sub('([{}])'.format('\\'.join(ELK_SPECIAL)), r'\\\1', val)
+
                      mapping_str = mapping_str.replace('"' + var + '"', '"' + val + '"')
 
                if es_id == var:
@@ -555,7 +559,8 @@ class es_indexer:
                except KeyError as err:
                   pass
 
-            raise UserWarning('Error add/update index ' + msg + "\r\n\r\n" + "Last detected errors:\r\n" + last_detected_errors)
+            # do not raise an error, print only the last_detected_errors instead
+            print('Bulk Error add/update index ' + msg + "\r\n\r\n" + "Last detected errors:\r\n" + last_detected_errors + "\r\n\r\n")
 
       except KeyError as err:
          raise UserWarning('JSON response format error, missing key: ' + str(err) + "\r\n\r\n" + msg)
