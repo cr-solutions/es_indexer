@@ -535,6 +535,8 @@ class es_indexer:
 
       resJSON = json.loads(res.text)
 
+
+      last_detected_errors = ''
       try:
          msg = ''
          msg += "\r\n\r\nRequest:\r\n"
@@ -546,7 +548,14 @@ class es_indexer:
             raise UserWarning('HTTP Error ' + str(res.status_code) + msg)
 
          if resJSON['errors'] != False:
-            raise UserWarning('Error add/update index ' + msg)
+            for items in resJSON['items']:
+               try:
+                  if items['index']['status'] != 200:
+                     last_detected_errors += json.dumps(items['index']['error']) + "\r\n"
+               except KeyError as err:
+                  pass
+
+            raise UserWarning('Error add/update index ' + msg + "\r\n\r\n" + "Last detected errors:\r\n" + last_detected_errors)
 
       except KeyError as err:
          raise UserWarning('JSON response format error, missing key: ' + str(err) + "\r\n\r\n" + msg)
