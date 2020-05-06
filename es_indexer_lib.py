@@ -13,7 +13,10 @@
 # All Rights Reserved.
 
 
-import pymysql, boto3, json, traceback, urllib3, requests, inspect, os, sys, re, datetime, time, collections
+import pymysql
+from pymysql._compat import text_type
+
+import boto3, json, traceback, urllib3, requests, inspect, os, sys, re, datetime, time, collections
 
 
 ###########################################################
@@ -210,6 +213,11 @@ class es_indexer:
       try:
          self.db = pymysql.connect(host=endpoint, port=port, user=user, passwd=pw, charset='utf8',
                                    connect_timeout=timeout)
+      except pymysql.Warning as err:
+         # Warnings should have errorcode and string message, just like exceptions
+         self.assertEqual(len(err.args), 2)
+         self.assertEqual(err.args[0], 1292)
+         self.assertTrue(isinstance(err.args[1], text_type))
       except pymysql.err.OperationalError as err:
          raise UserWarning('Error , current timeout ' + str(
             timeout) + ', you can increase it via key timeout in the *.json file - ' + str(err))
@@ -322,8 +330,14 @@ class es_indexer:
                   print("\r\nDebug " + inspect.currentframe().f_code.co_name + ";\r\n", "Query-Pre: " + query_pre,
                         "\r\n\r\n", "#" * 50, "\r\n")
 
+         except pymysql.Warning as err:
+            # Warnings should have errorcode and string message, just like exceptions
+            self.assertEqual(len(err.args), 2)
+            self.assertEqual(err.args[0], 1292)
+            self.assertTrue(isinstance(err.args[1], text_type))
          except pymysql.err.ProgrammingError as err:
             print('SQL error', err, query_pre)
+
 
       cursor = db.cursor(pymysql.cursors.DictCursor)
       query = self._sqlSelect()
@@ -337,6 +351,11 @@ class es_indexer:
       try:
          cursor.execute(query)
 
+      except pymysql.Warning as err:
+         # Warnings should have errorcode and string message, just like exceptions
+         self.assertEqual(len(err.args), 2)
+         self.assertEqual(err.args[0], 1292)
+         self.assertTrue(isinstance(err.args[1], text_type))
       except pymysql.err.ProgrammingError as err:
          print('SQL error', err, query)
 
@@ -409,9 +428,6 @@ class es_indexer:
                # remove non printable chars, linefeeds etc.
                val = re.sub(r'[\x00-\x1f\x7f-\x9f]', ' ', val)
 
-               # escape characters
-               ##val = re.sub(pattern=r'([\"\\])', repl=r'\\\1', string=val)
-
                # dynamic field mapping for ES, https://www.elastic.co/guide/en/elasticsearch/reference/6.5/dynamic-field-mapping.html
                if ftype == int or ftype == float:
                   mapping_str = mapping_str.replace('"' + var + '"', val)
@@ -434,8 +450,7 @@ class es_indexer:
                      mapping_str = mapping_str.replace('"' + var + '"', row[field])
                   else:
                      # escape characters
-                     ELK_SPECIAL = '+ - & | ! ( ) { } [ ] ^ " ~ * ? : \\'.split(' ')
-                     re.sub('([{}])'.format('\\'.join(ELK_SPECIAL)), r'\\\1', val)
+                     val = re.sub(pattern=r'([\"\\])', repl=r'\\\1', string=val)
 
                      mapping_str = mapping_str.replace('"' + var + '"', '"' + val + '"')
 
@@ -555,7 +570,7 @@ class es_indexer:
             for items in resJSON['items']:
                try:
                   if items['index']['status'] != 200:
-                     last_detected_errors += json.dumps(items['index']['error']) + "\r\n"
+                     last_detected_errors += 'Doc Id - ' + items['index']['_id'] + "\r\n" + json.dumps(items['index']['error']) + "\r\n\r\n"
                except KeyError as err:
                   pass
 
@@ -611,6 +626,11 @@ class es_indexer:
          cursor.execute(sql)
          db.commit()
 
+      except pymysql.Warning as err:
+         # Warnings should have errorcode and string message, just like exceptions
+         self.assertEqual(len(e.args), 2)
+         self.assertEqual(e.args[0], 1292)
+         self.assertTrue(isinstance(e.args[1], text_type))
       except pymysql.err.ProgrammingError as err:
          print('SQL error', err, sql)
 
