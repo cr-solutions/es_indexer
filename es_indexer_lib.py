@@ -16,12 +16,15 @@
 import pymysql
 from pymysql._compat import text_type
 
-import boto3, json, traceback, urllib3, requests, inspect, os, sys, re, datetime, time, collections
+import boto3, json, traceback, urllib3, requests, inspect, os, sys, re, datetime, time, collections, warnings
+from requests.auth import HTTPBasicAuth
 
 
 ###########################################################
 ###########################################################
 ###########################################################
+
+
 
 class es_indexer:
    s3bucket = ''
@@ -53,6 +56,8 @@ class es_indexer:
                 configfile: str = '', offset: int = None):
 
       global ES_INDEXER_DEBUG
+
+      warnings.simplefilter("error", category=pymysql.Warning)
 
       if os.environ.get('ES_INDEXER_DEBUG') is not None:
          ES_INDEXER_DEBUG = bool(os.environ.get('ES_INDEXER_DEBUG'))
@@ -525,6 +530,20 @@ class es_indexer:
          retry_wait_sec = 1
          pass
 
+      user = None
+      try:
+         user = self.config['es']['user']
+      except KeyError as err:
+         user = None
+         pass
+
+      pw = None
+      try:
+         pw = self.config['es']['password']
+      except KeyError as err:
+         pw = None
+         pass
+
       urllib3.disable_warnings(
          urllib3.exceptions.InsecureRequestWarning)  # to support local ES endpoints via SSH tunnel, sample: https://127.0.0.1:9200
 
@@ -534,7 +553,12 @@ class es_indexer:
       x = 0
       for x in range(0, retry):
          try:
-            res = requests.put(url=endpoint + '/_bulk', verify=False, data=json_byte, headers=headers, timeout=timeout)
+
+            if user is not None and pw is not None:
+               res = requests.put(url=endpoint + '/_bulk', verify=False, data=json_byte, headers=headers, timeout=timeout, auth=HTTPBasicAuth(user, pw))
+            else:
+               res = requests.put(url=endpoint + '/_bulk', verify=False, data=json_byte, headers=headers, timeout=timeout)
+
             break
          except requests.exceptions.ConnectionError as err:
             raise UserWarning('Connect Error: ' + str(err))

@@ -7,6 +7,9 @@
    },
  "es":{
    "endpoint":"https://myes-2ydp5bqfjfm2snkmyzkcszt4mi.eu-west-1.es.amazonaws.com:443",
+   "_comment-user_password":"optional, only if HTTP basic authentication is required",
+   "user": "myuser",
+   "password":"mypw",
    "timeout":5,
    "_comment-retry": "retry last indexing bulk on http read error",
    "retry": 1,
