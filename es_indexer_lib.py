@@ -218,11 +218,6 @@ class es_indexer:
       try:
          self.db = pymysql.connect(host=endpoint, port=port, user=user, passwd=pw, charset='utf8',
                                    connect_timeout=timeout)
-      except pymysql.Warning as err:
-         # Warnings should have errorcode and string message, just like exceptions
-         self.assertEqual(len(err.args), 2)
-         self.assertEqual(err.args[0], 1292)
-         self.assertTrue(isinstance(err.args[1], text_type))
       except pymysql.err.OperationalError as err:
          raise UserWarning('Error , current timeout ' + str(
             timeout) + ', you can increase it via key timeout in the *.json file - ' + str(err))
@@ -336,15 +331,13 @@ class es_indexer:
                         "\r\n\r\n", "#" * 50, "\r\n")
 
          except pymysql.Warning as err:
-            # Warnings should have errorcode and string message, just like exceptions
-            self.assertEqual(len(err.args), 2)
-            self.assertEqual(err.args[0], 1292)
-            self.assertTrue(isinstance(err.args[1], text_type))
+            raise UserWarning('SQL warning', err, query_pre)
          except pymysql.err.ProgrammingError as err:
-            print('SQL error', err, query_pre)
+            raise UserWarning('SQL error', err, query_pre)
 
 
       cursor = db.cursor(pymysql.cursors.DictCursor)
+      cursor._defer_warnings = True
       query = self._sqlSelect()
 
       if self.debug:
@@ -357,12 +350,9 @@ class es_indexer:
          cursor.execute(query)
 
       except pymysql.Warning as err:
-         # Warnings should have errorcode and string message, just like exceptions
-         self.assertEqual(len(err.args), 2)
-         self.assertEqual(err.args[0], 1292)
-         self.assertTrue(isinstance(err.args[1], text_type))
+         raise UserWarning('SQL warning', err, query)
       except pymysql.err.ProgrammingError as err:
-         print('SQL error', err, query)
+         raise UserWarning('SQL error', err, query)
 
       rows = cursor.fetchall();
 
@@ -651,12 +641,9 @@ class es_indexer:
          db.commit()
 
       except pymysql.Warning as err:
-         # Warnings should have errorcode and string message, just like exceptions
-         self.assertEqual(len(e.args), 2)
-         self.assertEqual(e.args[0], 1292)
-         self.assertTrue(isinstance(e.args[1], text_type))
+         raise UserWarning('SQL warning', err, sql)
       except pymysql.err.ProgrammingError as err:
-         print('SQL error', err, sql)
+         raise UserWarning('SQL error', err, sql)
 
       elapsed_time = time.time() - tick
       self.measure['timings'].update({'sql_update': elapsed_time})
