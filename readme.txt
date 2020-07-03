@@ -17,9 +17,9 @@ Install for AWS Lambda require AWS Lambda Deployment Package in Python (boto3 is
 for more see also https://docs.aws.amazon.com/lambda/latest/dg/lambda-python-how-to-create-deployment-package.html
 $ cd /home/ubuntu/python/myproject
 $ pip3 install --upgrade requests pymysql --system -t .
-$ zip -r ./test_es_indexer.zip .
+$ zip -r9 ./test_es_indexer.zip .
 
-after the setup of the code it can e.g. periodically indexed via cron jobs or cloud watch rules
+after the setup of the code it can e.g. periodically indexed via local cron jobs or AWS Cloud Watch rules in combination with AWS Lambda
 
 Default filesystem structure:
 folder with source file of entry point, as sample "test_es_indexer.py"
@@ -36,34 +36,21 @@ folder with source file of entry point, as sample "test_es_indexer.py"
 
 Sample Code "test_es_indexer.py":
 
+
+import time, datetime, traceback, os
+from libs.es_indexer_lib import es_indexer
 #################################
-# only for local test
 def lambda_handler(event, context):
 #################################
-
-   ###
-   # cut from here for Lambda
-   import time, datetime, traceback, os
-   from libs.es_indexer_lib import es_indexer
 
    print('start ' + time.strftime("%Y-%m-%d %H:%M"))
    start_time = time.time()
 
    try:
-      es_indexer.enable_debug() # activate debug output print
-
-      es_indexer('s3://my-bucket', 'config', 'test', 5) # without filename, the class search for a config file like test.json
-
-      es_indexer('file://', 'config', 'index1', 10, 'index1.json')
-
-      print(es_indexer.measure())  # to get output on screen or CloudWatch Logs
-
-      ####################################################################
-
-      # sample use full index if not lambda (started as sample from EC2)
+      # sample use to full indexing as sample from an EC2 instance
       if os.environ.get('AWS_REGION') is None:
 
-         es_indexer.disable_debug()
+         es_indexer.enable_debug() # activate debug output print
          offset = 0
          limit = 1000
          duration = 0
@@ -76,13 +63,26 @@ def lambda_handler(event, context):
 
             offset += limit
 
-            if offset % 3000 == 0:
+            if offset % 200 == 0:
                print("Offset: "+str(offset)+"\r\n")
                print(duration)
                duration = 0
+               time.sleep(0.90)
 
             if measure['indexed'] == 0:  # stop if no more records to index
                rows_left_to_upd = False
+
+            # sample use to batch indexing as sample via cron job
+         else:
+            es_indexer.disable_debug()
+
+            # sample 1
+            es_indexer('s3://my-bucket', 'config', 'test', 5) # without filename, the class search for a config file like test.json
+
+            # sample 2
+            es_indexer('file://', 'config', 'index1', 10, 'index1.json')
+
+            print(es_indexer.measure())  # to get output on screen or CloudWatch Logs
 
    except UserWarning as err: # exceptions raised from the class
       print('Error', err)
@@ -97,14 +97,16 @@ def lambda_handler(event, context):
 
    return None
 
-   # cut till here for Lambda
-   ###
 
 #################################
-# only for local test
-lambda_handler(None, None)
+# to test on local OS
+if os.environ.get('AWS_REGION') is None:
+   lambda_handler(None, None)
 #################################
 
 
 
-Copyright (c) 2019, PantherMedia (https://www.panthermedia.net), CR-Solutions (https://www.cr-solutions.net), Ricardo Cescon
+# The Initial Developers of the Original Code are:
+# Copyright (c) 2019-2020, CR-Solutions (https://www.cr-solutions.net), Ricardo Cescon
+# Contributor(s): Steffen Blaszkowski, PantherMedia (https://www.panthermedia.net)
+# All Rights Reserved.

@@ -8,8 +8,8 @@
 # the specific language governing rights and limitations under the License.
 
 # The Initial Developers of the Original Code are:
-# Copyright (c) 2019, PantherMedia (https://www.panthermedia.net), CR-Solutions (https://www.cr-solutions.net), Ricardo Cescon
-# Contributor(s): Steffen Blaszkowski
+# Copyright (c) 2019-2020, CR-Solutions (https://www.cr-solutions.net), Ricardo Cescon
+# Contributor(s): Steffen Blaszkowski, PantherMedia (https://www.panthermedia.net)
 # All Rights Reserved.
 
 
@@ -534,15 +534,57 @@ class es_indexer:
          pw = None
          pass
 
+      ###
+
+      replicas = None
+      try:
+         replicas = self.config['settings']['replicas']
+      except KeyError as err:
+         replicas = None
+         pass
+
+      shards = None
+      try:
+         shards = self.config['settings']['shards']
+      except KeyError as err:
+         shards = None
+         pass
+
+
       urllib3.disable_warnings(
          urllib3.exceptions.InsecureRequestWarning)  # to support local ES endpoints via SSH tunnel, sample: https://127.0.0.1:9200
 
       tick = time.time()
 
+
       res = None
       x = 0
       for x in range(0, retry):
          try:
+            ##################
+            # create index with settings if not exists
+            if replicas is not None and shards is not None:
+               if user is not None and pw is not None:
+                  res = requests.head(url=endpoint + '/' + self.indexname, verify=False, headers=headers, timeout=timeout, auth=HTTPBasicAuth(user, pw))
+               else:
+                  res = requests.head(url=endpoint + '/' + self.indexname, verify=False, headers=headers, timeout=timeout)
+
+
+               if res.status_code == 404:
+                  setting_json_str = '{   "settings": {   "index": {   "number_of_shards" : '+str(shards)+', "number_of_replicas" : '+str(replicas)+'   }   }   }'
+                  setting_json_byte = setting_json_str.encode('utf-8')
+
+                  if user is not None and pw is not None:
+                     res = requests.put(url=endpoint + '/' + self.indexname, verify=False, data=setting_json_byte, headers=headers, timeout=timeout, auth=HTTPBasicAuth(user, pw))
+                  else:
+                     res = requests.put(url=endpoint + '/' + self.indexname, verify=False, data=setting_json_byte, headers=headers, timeout=timeout)
+
+                  if res.status_code != 200:
+                     raise UserWarning('Error create index: ' + str(res.content))
+
+
+            ##################
+
 
             if user is not None and pw is not None:
                res = requests.put(url=endpoint + '/_bulk', verify=False, data=json_byte, headers=headers, timeout=timeout, auth=HTTPBasicAuth(user, pw))
@@ -562,6 +604,8 @@ class es_indexer:
             else:
                raise UserWarning('HTTP Read Error:, current timeout ' + str(
                   timeout) + ', you can increase it via key timeout in the *.json file - ' + str(err))
+         except UserWarning as err:
+            raise err
          except Exception as err:
             print('Unexpected error: ' + str(err))
             raise

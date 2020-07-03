@@ -35,7 +35,8 @@
          "join":"mytable.id = mytableEx.id_user",
          "schema":"mydb",
          "table":"mytableEx",
-         "fields":["age"]
+         "_comment_cast":"use as sample CAST to map the correct field type in Elasticsearch if you use MySQL ENUM",
+         "fields":["age", "CAST(CAST(mytableEx.priority AS CHAR) AS SIGNED) AS priority"]
       },
       {
          "_comment-extended-join":"you can use extended joins for reference tables too",
@@ -46,15 +47,21 @@
       }
    ]         
  },
+ "settings":{
+    "_comment":"requests a create index, if the index still not exists",
+    "replicas":1,
+    "shards":2
+ },
  "mapping":
  {
-   "_comment":"_id is the internal elasticsearch id field, _commant and _id will be removed from JSON transferred to ES",
+   "_comment":"_id is the internal Elasticsearch id field, _commant and _id will be removed from JSON transferred to Elasticsearch",
    "_id":"$id_user",
    "_type":"_doc",
    "id_user":"$id_user",
    "firstname":"$firstname",   
    "surname":"$surname",
    "age":"$age",
+   "type":"$type",
    "json_payload":"$json_payload"
  }
 }
