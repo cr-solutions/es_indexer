@@ -15,9 +15,25 @@ $ pip3 install --upgrade pymysql, boto3, requests
 
 Install for AWS Lambda require AWS Lambda Deployment Package in Python (boto3 is default installed on Lambda):
 for more see also https://docs.aws.amazon.com/lambda/latest/dg/lambda-python-how-to-create-deployment-package.html
+
+Sample Bash Deployment Package
 $ cd /home/ubuntu/python/myproject
 $ pip3 install --upgrade requests pymysql --system -t .
 $ zip -r9 ./test_es_indexer.zip .
+
+
+Sample for a deploy.sh 
+# !/bin/sh
+python3 -m pip install --upgrade requests pymysql --system --target package
+cd package
+zip -r9 ../test_es_indexer.zip .
+cd ..
+zip -g test_es_indexer.zip libs/es_indexer_lib.py
+zip -g test_es_indexer.zip config/media.json
+zip -g test_es_indexer.zip test_es_indexer.py
+aws lambda update-function-code --function-name test_es_indexer --zip-file fileb://test_es_indexer.zip
+
+
 
 after the setup of the code it can e.g. periodically indexed via local cron jobs or AWS Cloud Watch rules in combination with AWS Lambda
 
