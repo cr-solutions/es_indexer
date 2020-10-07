@@ -50,10 +50,39 @@ class es_indexer:
 
    offset = None
 
+   last_modified_timestamp_upd = True
+
    ###########################################################
 
    def __init__(self, s3bucket_filetype: str, s3prefix_folder: str, indexname: str, bulklimit: int,
-                configfile: str = '', offset: int = None):
+                configfile: str = '', offset: int = None, last_modified_timestamp_upd: bool = True):
+      """
+      Parameters
+      ----------
+      s3bucket_filetype : str
+         s3://my-bucket or file://
+      s3prefix_folder : str
+         S3 prefix or local folder name where the config file is located
+      indexname : str, optional
+         name of index in Elasticsearch
+      bulklimit : int
+         number of records per run or in case of init per loop
+      configfile : str, optional
+         name of config file
+      offset : int, optional
+         used for initial indexing
+      last_modified_timestamp_upd : bool, optional
+         useful if you initial indexing an test env from same source as productive
+
+      Samples
+      ----------
+      # sample 1
+      es_indexer('s3://my-bucket', 'config', 'test', 5) # without filename, the class search for a config file like test.json
+      # sample 2
+      es_indexer('file://', 'config', 'index1', 10, 'index1.json')
+      # sample 3
+      es_indexer('file://', 'config', 'index1', limit, 'index1.json', offset, False)
+      """
 
       global ES_INDEXER_DEBUG
 
@@ -89,6 +118,7 @@ class es_indexer:
          self.bulklimit = 1
 
       self.offset = offset
+      self.last_modified_timestamp_upd = last_modified_timestamp_upd
 
       # print('debug', __class__, inspect.currentframe().f_back.f_lineno)
       # return None
@@ -641,7 +671,8 @@ class es_indexer:
       elapsed_time = time.time() - tick
       self.measure['timings'].update({'es_bulk': elapsed_time})
 
-      self._sqlUpd()
+      if self.last_modified_timestamp_upd:
+         self._sqlUpd()
 
    ###########################################################
 
