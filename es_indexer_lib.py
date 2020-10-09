@@ -278,7 +278,7 @@ class es_indexer:
       except KeyError as err:
          raise UserWarning('JSON file ' + self.config_file + ' format error, missing key: ' + str(err))
 
-     
+
 
       fields = ''
       tfrom = ''
@@ -711,14 +711,26 @@ class es_indexer:
       tick = time.time()
 
       try:
-         cursor = db.cursor()
-         cursor.execute(sql)
-         db.commit()
+         lock_messages_error = ['Deadlock found', 'Lock wait timeout exceeded']
+         MAXIMUM_RETRY_ON_DEADLOCK = 3
+         rcount = 0
+         while rcount < MAXIMUM_RETRY_ON_DEADLOCK:
+            try:
+               cursor = db.cursor()
+               cursor.execute(sql)
+               db.commit()
+            except pymysql.err.OperationalError as err:
+               if any(msg in err.message for msg in lock_messages_error) and rcount <= MAXIMUM_RETRY_ON_DEADLOCK:
+                  rcount += 1
+                  time.sleep(rcount*1)
+               else:
+                  raise
 
       except pymysql.Warning as err:
          raise UserWarning('SQL warning', err, sql)
       except pymysql.err.ProgrammingError as err:
          raise UserWarning('SQL error', err, sql)
+
 
       elapsed_time = time.time() - tick
       self.measure['timings'].update({'sql_update': elapsed_time})
