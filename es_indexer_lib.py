@@ -321,7 +321,7 @@ class es_indexer:
                   self.offset + self.bulklimit)
 
          if len(additional_where) > 0:
-            if self.offset is None:
+            if self.offset is None or query.find(' WHERE ') != -1:
                query += ' AND ' + additional_where
             else:
                query += ' WHERE ' + additional_where
