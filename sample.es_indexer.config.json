@@ -21,6 +21,7 @@
    "last-modified-timestamp-upd-key":"id=$id_user",
    "query-pre": "SET SESSION group_concat_max_len = 2048;",
    "group-by":"",
+   "_comment-sort":"to sort by last_mod_field with sort order or leave empty for natural sort"
    "sort": "ASC",
    "additional-where": "",
    "_comment-additional-primary-key-for-full-indexing":"in case of full indexing, this increase the performance because it will be used as natural offset as sample by WHERE mydb.mytable,id >= [id] AND mydb.mytable,id <= [id]    (id must be numceric)",

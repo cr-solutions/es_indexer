@@ -278,10 +278,7 @@ class es_indexer:
       except KeyError as err:
          raise UserWarning('JSON file ' + self.config_file + ' format error, missing key: ' + str(err))
 
-      if sort.upper() == 'DESC':
-         sort = 'DESC'
-      else:
-         sort = 'ASC'
+     
 
       fields = ''
       tfrom = ''
@@ -334,7 +331,10 @@ class es_indexer:
                  additional_primary_key_for_full_indexing) == 0:  # use OFFSET/LIMIT only if not possible via PK
             offset = str(self.offset) + ', '
 
-         query += ' ORDER BY ' + last_mod_field + ' ' + sort + ' LIMIT ' + offset + str(self.bulklimit)
+         if len(sort) > 0:
+            query += ' ORDER BY ' + last_mod_field + ' ' + sort
+
+         query += ' LIMIT ' + offset + str(self.bulklimit)
 
 
       except KeyError as err:
