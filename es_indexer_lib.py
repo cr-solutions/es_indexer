@@ -720,7 +720,8 @@ class es_indexer:
                cursor.execute(sql)
                db.commit()
             except pymysql.err.OperationalError as err:
-               if any(msg in err.message for msg in lock_messages_error) and rcount <= MAXIMUM_RETRY_ON_DEADLOCK:
+               (code, message) = err.args
+               if any(msg in message for msg in lock_messages_error) and rcount <= MAXIMUM_RETRY_ON_DEADLOCK:
                   rcount += 1
                   time.sleep(rcount*1)
                   continue
