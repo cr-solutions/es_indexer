@@ -723,8 +723,10 @@ class es_indexer:
                if any(msg in err.message for msg in lock_messages_error) and rcount <= MAXIMUM_RETRY_ON_DEADLOCK:
                   rcount += 1
                   time.sleep(rcount*1)
+                  continue
                else:
                   raise
+            break
 
       except pymysql.Warning as err:
          raise UserWarning('SQL warning', err, sql)
