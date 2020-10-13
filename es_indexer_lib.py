@@ -679,8 +679,28 @@ class es_indexer:
    def _sqlUpd(self):
       db = self._rdsConnect()
 
+      retry = None
+      try:
+         retry = int(self.config['rds']['retry'])
+
+         if retry < 1:
+            retry = 1
+
+      except KeyError as err:
+         retry = 1
+         pass
+
+      retry_wait_sec = None
+      try:
+         retry_wait_sec = int(self.config['rds']['retry_wait_sec'])
+      except KeyError as err:
+         retry_wait_sec = 1
+         pass
+
       last_mod_field = self.config['sql']['last-modified-timestamp-field']
       last_mod_field = last_mod_field.split('.')
+
+
 
       if len(last_mod_field) != 3:
          raise UserWarning('format error, <schema>.<table>.<field>')
@@ -712,21 +732,25 @@ class es_indexer:
 
       try:
          lock_messages_error = ['Deadlock found', 'Lock wait timeout exceeded']
-         MAXIMUM_RETRY_ON_DEADLOCK = 3
+         MAXIMUM_RETRY_ON_DEADLOCK = retry
          rcount = 0
          while rcount < MAXIMUM_RETRY_ON_DEADLOCK:
             try:
                cursor = db.cursor()
                cursor.execute(sql)
                db.commit()
+
             except pymysql.err.OperationalError as err:
                (code, message) = err.args
                if any(msg in message for msg in lock_messages_error) and rcount <= MAXIMUM_RETRY_ON_DEADLOCK:
                   rcount += 1
-                  time.sleep(rcount*1)
+                  time.sleep(retry_wait_sec)
                   continue
+               elif rcount > MAXIMUM_RETRY_ON_DEADLOCK:
+                  raise UserWarning('DB Lock Error after ' + str(rcount) + ' retry\'s', err, sql)
                else:
                   raise
+
             break
 
       except pymysql.Warning as err:

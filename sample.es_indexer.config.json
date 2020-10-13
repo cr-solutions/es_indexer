@@ -3,7 +3,8 @@
    "endpoint":"mydatabase.c55rlhhdrfwl.eu-west-1.rds.amazonaws.com:3306",
    "user":"myuser",
    "password":"mypw",
-   "retry": 3
+   "retry": 1,
+   "retry_wait_sec": 3
    },
  "es":{
    "endpoint":"https://myes-2ydp5bqfjfm2snkmyzkcszt4mi.eu-west-1.es.amazonaws.com:443",
