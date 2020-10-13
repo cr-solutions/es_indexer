@@ -734,7 +734,7 @@ class es_indexer:
          lock_messages_error = ['Deadlock found', 'Lock wait timeout exceeded']
          MAXIMUM_RETRY_ON_DEADLOCK = retry
          rcount = 0
-         while rcount < MAXIMUM_RETRY_ON_DEADLOCK:
+         while rcount <= MAXIMUM_RETRY_ON_DEADLOCK:
             try:
                cursor = db.cursor()
                cursor.execute(sql)
@@ -742,12 +742,13 @@ class es_indexer:
 
             except pymysql.err.OperationalError as err:
                (code, message) = err.args
-               if any(msg in message for msg in lock_messages_error) and rcount <= MAXIMUM_RETRY_ON_DEADLOCK:
-                  rcount += 1
-                  time.sleep(retry_wait_sec)
-                  continue
-               elif rcount > MAXIMUM_RETRY_ON_DEADLOCK:
-                  raise UserWarning('DB Lock Error after ' + str(rcount) + ' retry\'s', err, sql)
+               if any(msg in message for msg in lock_messages_error):
+                  if  rcount < MAXIMUM_RETRY_ON_DEADLOCK:
+                     rcount += 1
+                     time.sleep(retry_wait_sec)
+                     continue
+                  elif rcount >= MAXIMUM_RETRY_ON_DEADLOCK:
+                     raise UserWarning('DB Lock Error after ' + str(rcount) + ' retry\'s', err, sql)
                else:
                   raise
 
