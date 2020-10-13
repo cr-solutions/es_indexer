@@ -748,7 +748,7 @@ class es_indexer:
                      time.sleep(retry_wait_sec)
                      continue
                   elif rcount >= MAXIMUM_RETRY_ON_DEADLOCK:
-                     raise UserWarning('DB Lock Error after ' + str(rcount) + ' retry\'s', err, sql)
+                     raise UserWarning('DB Lock Error, retried ' + str(rcount) + ' times with ' + str(retry_wait_sec) + ' sec. per retry', err, sql)
                else:
                   raise
 
