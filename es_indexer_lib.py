@@ -705,24 +705,40 @@ class es_indexer:
       if len(last_mod_field) != 3:
          raise UserWarning('format error, <schema>.<table>.<field>')
 
-      sql = 'UPDATE ' + last_mod_field[0] + '.' + last_mod_field[1] + ' SET ' + last_mod_field[
-         2] + ' = "1970-01-01 00:00:00" WHERE '
+      ###########################################################################
+      # optimized UPDATE I/O workload for better lock handling via single updates in transaction instead of IN()
 
-      i = 0
+      # sql = 'UPDATE ' + last_mod_field[0] + '.' + last_mod_field[1] + ' SET ' + last_mod_field[
+      #    2] + ' = "1970-01-01 00:00:00" WHERE '
+      #
+      # i = 0
+      # for item in self.upd_keys:
+      #    last_mod_field_upd_key = item.split('=')
+      #    upd_key_name = last_mod_field_upd_key[0]
+      #    upd_key_val = last_mod_field_upd_key[1]
+      #
+      #    if i == 0:
+      #       sql += upd_key_name + ' IN(' + upd_key_val + ','
+      #    else:
+      #       sql += upd_key_val + ','
+      #
+      #    i += 1
+      #
+      # sql = sql[0:-1]
+      # sql += ');'
+
+      base_sql = 'UPDATE ' + last_mod_field[0] + '.' + last_mod_field[1] + ' SET ' + last_mod_field[2] + ' = "1970-01-01 00:00:00" WHERE '
+      sql = ''
+
+
       for item in self.upd_keys:
          last_mod_field_upd_key = item.split('=')
          upd_key_name = last_mod_field_upd_key[0]
          upd_key_val = last_mod_field_upd_key[1]
 
-         if i == 0:
-            sql += upd_key_name + ' IN(' + upd_key_val + ','
-         else:
-            sql += upd_key_val + ','
+         sql += base_sql + upd_key_name + ' = ' + upd_key_val + '; '
 
-         i += 1
-
-      sql = sql[0:-1]
-      sql += ')'
+      ###########################################################################
 
       if self.debug:
          print("\r\nDebug " + inspect.currentframe().f_code.co_name + ";\r\n", sql, "\r\n\r\n",
@@ -737,7 +753,8 @@ class es_indexer:
          while rcount <= MAXIMUM_RETRY_ON_DEADLOCK:
             try:
                cursor = db.cursor()
-               cursor.execute(sql)
+               db.begin()
+               cursor.executemany(sql, [])
                db.commit()
 
             except pymysql.err.OperationalError as err:
