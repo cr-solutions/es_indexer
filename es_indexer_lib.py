@@ -450,6 +450,7 @@ class es_indexer:
                ftype = type(row[field])
                val = str(row[field])
 
+
                # remove non printable chars, linefeeds etc.
                val = re.sub(r'[\x00-\x1f\x7f-\x9f]', ' ', val)
 
@@ -471,9 +472,11 @@ class es_indexer:
                   except ValueError as e:
                      is_json = False
 
-                  if is_json and val != 'Infinity':  # 'Infinity' string is a special case for JSON
+                  # 'Infinity' and 'NaN' string is a special case for JSON, check also for digit because json.loads == True for numbers
+                  if is_json and val != 'Infinity' and val != 'NaN' and not val.replace('.','',1).isdigit():
                      mapping_str = mapping_str.replace('"' + var + '"', row[field])
-                  else:
+
+                  else: # strings
                      # escape characters
                      val = re.sub(pattern=r'([\"\\])', repl=r'\\\1', string=val)
 
