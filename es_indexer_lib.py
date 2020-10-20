@@ -437,7 +437,6 @@ class es_indexer:
          for row in rows:
             mapping = self.config["mapping"]
             es_id = es_id_var_name
-            last_mod_field_upd_key = self.config['sql']['last-modified-timestamp-upd-key']
 
             if '_comment' in mapping:
                del mapping['_comment']
@@ -450,9 +449,9 @@ class es_indexer:
                ftype = type(row[field])
                val = str(row[field])
 
-
                # remove non printable chars, linefeeds etc.
-               val = re.sub(r'[\x00-\x1f\x7f-\x9f]', ' ', val)
+               val = re.sub(r'[\x00-\x1f\x7f-\x9f]', ' ', val).strip()
+
 
                # dynamic field mapping for ES, https://www.elastic.co/guide/en/elasticsearch/reference/6.5/dynamic-field-mapping.html
                if ftype == int or ftype == float:
