@@ -730,7 +730,7 @@ class es_indexer:
       # sql += ');'
 
       base_sql = 'UPDATE ' + last_mod_field[0] + '.' + last_mod_field[1] + ' SET ' + last_mod_field[2] + ' = "1970-01-01 00:00:00" WHERE '
-      sql = ''
+      sql = []
 
 
       for item in self.upd_keys:
@@ -738,7 +738,7 @@ class es_indexer:
          upd_key_name = last_mod_field_upd_key[0]
          upd_key_val = last_mod_field_upd_key[1]
 
-         sql += base_sql + upd_key_name + ' = ' + upd_key_val + '; '
+         sql.append(base_sql + upd_key_name + ' = ' + upd_key_val + ';')
 
       ###########################################################################
 
@@ -756,7 +756,10 @@ class es_indexer:
             try:
                cursor = db.cursor()
                db.begin()
-               cursor.executemany(sql, [])
+
+               for upd in sql:
+                  cursor.execute(upd)
+
                db.commit()
 
             except pymysql.err.OperationalError as err:
@@ -766,10 +769,10 @@ class es_indexer:
                      rcount += 1
                      time.sleep(retry_wait_sec)
                      continue
-                  elif rcount >= MAXIMUM_RETRY_ON_DEADLOCK:
+                  else:
                      raise UserWarning('DB Lock Error, retried ' + str(rcount) + ' times with ' + str(retry_wait_sec) + ' sec. per retry', err, sql)
                else:
-                  raise
+                  raise err
 
             break
 
@@ -781,6 +784,7 @@ class es_indexer:
 
       elapsed_time = time.time() - tick
       self.measure['timings'].update({'sql_update': elapsed_time})
+
 
    ###########################################################
 
