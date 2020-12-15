@@ -479,7 +479,8 @@ class es_indexer:
                      # remove HTML special chars
                      json_val = html.unescape(json_val)
                      # remove linefeed etc.
-                     json_val = val.strip(json_val)
+                     json_val = json_val.strip(json_val)
+
 
                      mapping_str = mapping_str.replace('"' + var + '"', json_val)
 
