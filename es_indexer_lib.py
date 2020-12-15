@@ -16,7 +16,7 @@
 import pymysql
 from pymysql._compat import text_type
 
-import boto3, json, traceback, urllib3, requests, inspect, os, sys, re, datetime, time, collections, warnings
+import boto3, json, traceback, urllib3, requests, inspect, os, sys, re, datetime, time, collections, warnings, html
 from requests.auth import HTTPBasicAuth
 
 
@@ -473,9 +473,22 @@ class es_indexer:
 
                   # 'Infinity' and 'NaN' string is a special case for JSON, check also for digit because json.loads == True for numbers
                   if is_json and val != 'Infinity' and val != 'NaN' and not val.replace('.','',1).isdigit():
-                     mapping_str = mapping_str.replace('"' + var + '"', row[field])
+
+                     json_val = row[field]
+
+                     # remove HTML special chars
+                     json_val = html.unescape(json_val)
+                     # remove linefeed etc.
+                     json_val = val.strip(json_val)
+
+                     mapping_str = mapping_str.replace('"' + var + '"', json_val)
 
                   else: # strings
+                     # remove HTML special chars
+                     val = html.unescape(val)
+                     # remove linefeed etc.
+                     val = val.strip(val)
+
                      # escape characters
                      val = re.sub(pattern=r'([\"\\])', repl=r'\\\1', string=val)
 
