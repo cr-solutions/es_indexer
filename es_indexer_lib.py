@@ -478,16 +478,25 @@ class es_indexer:
 
                      # remove HTML special chars
                      json_val = html.unescape(json_val)
-                     # remove linefeed etc.
-                     json_val = json_val.strip()
+                     # remove non ascii
+                     json_val = json_val.encode("ascii", "ignore")
+                     json_val = json_val.decode()
+                     # remove linefeeds
+                     json_val = json_val.replace("\r", " ")
+                     json_val = json_val.replace("\n", " ")
+
 
                      mapping_str = mapping_str.replace('"' + var + '"', json_val)
 
                   else: # strings
                      # remove HTML special chars
                      val = html.unescape(val)
-                     # remove linefeed etc.
-                     val = val.strip()
+                     # remove non ascii
+                     val = val.encode("ascii", "ignore")
+                     val = val.decode()
+                     # remove linefeeds
+                     val = val.replace("\r", " ")
+                     val = val.replace("\n", " ")
 
                      # escape characters
                      val = re.sub(pattern=r'([\"\\])', repl=r'\\\1', string=val)
