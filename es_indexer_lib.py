@@ -476,6 +476,8 @@ class es_indexer:
 
                      json_val = row[field]
 
+                     # remove all &#x, because "html.unescape" not do it for some correctly
+                     json_val = re.sub(r'&#x', ' ', json_val)
                      # remove HTML special chars
                      json_val = html.unescape(json_val)
                      # remove non ascii
@@ -489,6 +491,8 @@ class es_indexer:
                      mapping_str = mapping_str.replace('"' + var + '"', json_val)
 
                   else: # strings
+                     # remove all &#x, because "html.unescape" not do it for some correctly
+                     val = re.sub(r'&#x', ' ', val)
                      # remove HTML special chars
                      val = html.unescape(val)
                      # remove non ascii
